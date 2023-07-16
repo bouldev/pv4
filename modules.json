@@ -1,0 +1,40 @@
+[
+	{
+		"name": "SIGINTShutdownHandler",
+		"path": "./modules/shutdown/libpv4-shutdown.so",
+		"init_funcs": [
+			"mdl_stdn_register_sigint_handler"
+		]
+	},
+	{
+		"name": "NEMCHelper",
+		"path": "./modules/nemc_helper/libpv4-nemc-helper.so",
+		"init_funcs": [
+			"_doInit_setClientsKeepAlive"
+		],
+		"pre_deinit_funcs": [
+			"mdl_nemc_helper_interrupt"
+		]
+	},
+	{
+		"name": "Whitelist",
+		"path": "./modules/whitelist/libpv4-whitelist.so",
+		"init_funcs": [],
+		"deinit_funcs": []
+	},
+	{
+		"name": "Products",
+		"path": "./modules/products/libpv4-products.so"
+	},
+	{
+		"name": "opencv_pre",
+		"path": "/usr/lib/x86_64-linux-gnu/libopencv_imgcodecs.so"
+	},
+	{
+		"name": "UserCenter",
+		"path": "./modules/user_center/libpv4-user-center.so",
+		"init_funcs": [
+			"init_user_center"
+		]
+	}
+]

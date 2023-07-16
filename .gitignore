@@ -1,0 +1,14 @@
+depends/jsoncpp
+depends/jsoncpp-aarch64
+depends/libfmt
+depends/libfmt-aarch64
+depends/mongo-c-driver
+depends/mongo-cxx-driver
+depends/mongo-c-driver-aarch64
+depends/mongo-cxx-driver-aarch64
+test/
+logs/
+pv4
+pv4-aarch64
+*.so
+*.o

@@ -1,0 +1,22 @@
+[submodule "cpp-httplib"]
+	path = cpp-httplib
+	url = ../../yhirose/cpp-httplib.git
+[submodule "fmt"]
+	path = fmt
+	url = ../../fmtlib/fmt.git
+	branch = 9.1.0
+[submodule "jsoncpp"]
+	path = jsoncpp
+	url = ../../open-source-parsers/jsoncpp.git
+[submodule "mongodb/mongo-c-driver"]
+	path = mongodb/mongo-c-driver
+	url = ../../mongodb/mongo-c-driver.git
+	branch = r1.23
+[submodule "mongodb/mongo-cxx-driver"]
+	path = mongodb/mongo-cxx-driver
+	url = ../../mongodb/mongo-cxx-driver.git
+	branch = releases/v3.7
+[submodule "spdlog"]
+	path = spdlog
+	url = ../../gabime/spdlog.git
+	branch = v1.x

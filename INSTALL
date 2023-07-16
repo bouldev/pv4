@@ -1,0 +1,7 @@
+Just `make` and see what is missing ;)
+
+mongodb is required. You may want to set yourself as an administrator, which 
+can be done by:
+`db.whitelist.updateOne({username:"YOUR_USERNAME"}, {$set:{admin:true}})`.
+
+Due to the cache in the server, you'd probably have to restart the server.
