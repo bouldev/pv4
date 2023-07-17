@@ -913,8 +913,6 @@ namespace FBUC {
 		payments_mutex.unlock_shared();
 		if(intent->needs_verify) {
 			return {false, "用户需要完成一次官方支付以满足唯一性验证需求"};
-		}else if(intent->paired) {
-			return {false, "指定确认码已然匹配，请让用户重新结算。"};
 		}else if(intent->card_only) {
 			return {false, "支付中存在仅官方支付商品，不能使用此方法结帐"};
 		}else if(intent->banned_from_payment) {
