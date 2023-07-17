@@ -18,6 +18,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install libzstd-dev libopencv-dev
+        echo 1.23.2>mongodb/mongo-c-driver/VERSION_CURRENT
 
     - name: Build
       run: |
