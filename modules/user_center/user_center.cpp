@@ -474,6 +474,8 @@ namespace FBUC {
 				strcpy(otpdata->secret, pUser->two_factor_authentication_secret->c_str());
 				session->tmp_otp=std::shared_ptr<OTPDataPack>(otpdata);
 				totp_new(&(otpdata->data), otpdata->secret, hmac_algo_sha1, get_current_time, 6, 30);
+			}else{
+				session->login_2fa=false;
 			}
 		}
 		*pUser->keep_reference=true;
