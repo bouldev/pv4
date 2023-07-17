@@ -42,13 +42,12 @@ void stackTrace(int signal) {
 		printf("STACK IS RUINED\n");
 		exit(10);
 	}
-	std::string stack_dump_str;
 	std::string final_cause;
 	Dl_info c_dl_info;
 	for(int i=0;i<addrlen;i++) {
 		void *dl_handle;
 		if(dladdr1(addrlist[i], &c_dl_info, &dl_handle, RTLD_DL_LINKMAP)==0) {
-			stack_dump_str+=fmt::format("#{}: [{:#x}:dladdr() failed]\n", i, (uint64_t)addrlist[i]);
+			SPDLOG_CRITICAL("#{}: [{:#x}:dladdr() failed]\n", i, (uint64_t)addrlist[i]);
 			continue;
 		}
 		if(!c_dl_info.dli_sname) {
@@ -64,9 +63,9 @@ void stackTrace(int signal) {
 		}
 		std::string module_name=Modules::getModuleFromHandle(dl_handle);
 		if(module_name.length()!=0) {
-			stack_dump_str+=fmt::format("#{}: {}+{:#x} ([{}]:{}+{:#x})\n", i, symbol_name, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_saddr, module_name, c_dl_info.dli_fname, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_fbase);
+			SPDLOG_CRITICAL("#{}: {}+{:#x} ([{}]:{}+{:#x})\n", i, symbol_name, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_saddr, module_name, c_dl_info.dli_fname, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_fbase);
 		}else{
-			stack_dump_str+=fmt::format("#{}: {}+{:#x} ({}+{:#x})\n", i, symbol_name, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_saddr, c_dl_info.dli_fname, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_fbase);
+			SPDLOG_CRITICAL("#{}: {}+{:#x} ({}+{:#x})\n", i, symbol_name, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_saddr, c_dl_info.dli_fname, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_fbase);
 		}
 		if(final_cause.length()==0&&module_name.length()) {
 			final_cause=module_name;
@@ -74,7 +73,6 @@ void stackTrace(int signal) {
 		if(demangling_status==0)
 			free(symbol_name);
 	}
-	SPDLOG_CRITICAL("{}", stack_dump_str);
 	if(final_cause.length()) {
 		SPDLOG_WARN("Final cause might be: [{}]", final_cause);
 		/*SPDLOG_WARN("Module-liked cause, entering rescue mode");
@@ -88,6 +86,7 @@ void stackTrace(int signal) {
 		::signal(61, SIG_IGN);
 		pthread_exit(nullptr);*/
 	}
+	spdlog::flush_on(spdlog::level::critical);
 	_exit(10);
 }
 
