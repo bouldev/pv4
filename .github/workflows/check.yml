@@ -24,6 +24,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: depends
+        key: pv4-dep
 
     - name: Build
       run: |
@@ -50,6 +51,6 @@ jobs:
         mv modules/*/libpv4-*.so prod_modules/
         tar -czf pv4-prod-dry.tar.gz pv4 modules.json prod_modules
     - name: Upload artifact
-      uses: actions/upload-artifafct@v3
+      uses: actions/upload-artifact@v3
       with:
         path: pv4-prod-dry.tar.gz
