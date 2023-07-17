@@ -1,4 +1,5 @@
 #pragma once
+#if !__has_include("modules/private/nemc_helper.h")
 
 #ifndef NEMC_HELPER_PRIVATE_HEADER_INCLUDED
 
@@ -57,5 +58,11 @@ public:
 };
 
 std::string NEMCCalculateStartType(std::string const& content, std::string const& uid);
+
+#endif
+
+#else
+
+#include "modules/private/nemc_helper.h"
 
 #endif

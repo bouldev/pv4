@@ -1,4 +1,7 @@
 #pragma once
+
+#if !__has_include("../private/secrets/secrets.h")
+
 #include <string>
 #include <fmt/format.h>
 
@@ -42,3 +45,9 @@ public:
 
 const unsigned char *_fbtoken_iv=(unsigned char*)"1234567890abcdef";
 const unsigned char *_fbtoken_key=(unsigned char*)"0123456789abcdefghijklmnopqrstuv";
+
+#else
+
+#include "../private/secrets/secrets.h"
+
+#endif

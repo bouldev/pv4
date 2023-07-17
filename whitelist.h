@@ -1,5 +1,4 @@
 #pragma once
-
 #ifndef WHITELIST_PRIVATE_INCLUDED
 
 #include <unordered_map>
@@ -170,6 +169,5 @@ namespace FBWhitelist {
 	};
 
 };
-
 
 #endif
