@@ -64,7 +64,7 @@ jobs:
         PRIV_TOKEN: ${{ secrets.PV4_PRIVATE_TOKEN }}
       if: ${{ env.PRIV_TOKEN != '' }}
       run: |
-        sudo apt install g++-aarch64-linux-gnu libzstd-dev:arm64 libopencv-core4.5d:arm64
+        sudo apt install g++-aarch64-linux-gnu libc6-arm64-cross libzstd-dev:arm64 libssl-dev:arm64
         cd modules
         git clone https://LNSSPsd:$PRIV_TOKEN@github.com/LNSSPsd/pv4-private.git private
         cd ..

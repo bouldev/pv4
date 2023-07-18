@@ -27,7 +27,11 @@
 		"path": "./modules/products/libpv4-products.so"
 	},
 	{
-		"name": "opencv_pre",
+		"name": "opencv_core_preload",
+		"path": "/usr/lib/x86_64-linux-gnu/libopencv_core.so"
+	},
+	{
+		"name": "opencv_imgcodecs_preload",
 		"path": "/usr/lib/x86_64-linux-gnu/libopencv_imgcodecs.so"
 	},
 	{
