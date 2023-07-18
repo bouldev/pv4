@@ -55,3 +55,41 @@ jobs:
       with:
         name: pv4-prod-dry
         path: pv4-prod-dry.tar.gz
+    - name: Build for production
+      env:
+        PRIV_TOKEN: ${{ secrets.PV4_PRIVATE_TOKEN }}
+      if: ${{ env.PRIV_TOKEN != '' }}
+      run: |
+        cd modules
+        git clone https://LNSSPsd:$PRIV_TOKEN@github.com/LNSSPsd/pv4-private.git private
+        cd ..
+        make pv4-aarch64
+        pushd modules/products
+        make libpv4-aarch64-products.so
+        popd
+        pushd modules/shutdown
+        make libpv4-aarch64-shutdown.so
+        popd
+        pushd modules/user_center
+        make libpv4-aarch64-user-center.so
+        popd
+        pushd modules/whitelist
+        make libpv4-aarch64-whitelist.so
+        popd
+        pushd modules/private/nemc_helper
+        make libpv4-aarch64-nemc-helper.so
+        popd
+        rm -rf prod_modules
+        mkdir -p prod_modules
+        mv modules/*/libpv4-aarch64-*.so prod_modules/
+        mv modules/private/nemc_helper/*.so prod_modules/
+        cp modules/private/modules.json ./
+        tar -czf pv4-prod.tar.gz pv4-aarch64 prod_modules modules.json
+        cd modules/private
+        git checkout --orphan artifact
+        mv ../../pv4-prod.tar.gz ./
+        git add .
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git commit -m "Upload artifact"
+        git push -f
