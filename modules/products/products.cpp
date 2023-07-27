@@ -74,7 +74,7 @@ struct MonthlyPlanNewUserProduct : Product {
 	}
 	
 	virtual unsigned int price() {
-		return 70;
+		return 45;
 	}
 	
 	virtual bool no_multi_add() {

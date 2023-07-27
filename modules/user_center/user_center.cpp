@@ -1095,10 +1095,10 @@ namespace FBUC {
 			std::string i_str=bsoncxx::to_json(i);
 			Json::Value item_jv;
 			Utils::parseJSON(i_str, &item_jv);
+			uint64_t date_v=item_jv["date"]["$date"].asUInt64();
+			item_jv["date"]=date_v;
 			std::string description="";
-			bool no_refund=false;
 			if(item_jv["refunded"].asBool()) {
-				no_refund=true;
 				description+="<b style=\"color:red;\">[已退款]</b><br/>";
 			}
 			if(item_jv["helper"].isString()&&item_jv["helper"].asString()[0]=='@') {
@@ -1117,13 +1117,9 @@ namespace FBUC {
 				description+=fmt::format("<li>{} - ￥{}</li>", sub["product_name"].asString(), sub["price"].asInt());
 			}
 			description+="</ol>";
-			if(time(nullptr)*1000>item_jv["date"].asUInt64()+(uint64_t)1000*3600*24*30) {
-				no_refund=true;
-			}
 			Json::Value current;
 			current["identifier"]=item_jv["date"];
 			current["description"]=description;
-			current["no_refund"]=no_refund;
 			ret_arr.insert(0, current);
 		}
 		return {true, "", "payments", ret_arr, "pages", 1};
@@ -1226,7 +1222,7 @@ namespace FBUC {
 		}
 		int64_t con_id=(int64_t)time(nullptr);
 		fbdb["contacts"].insert_one(document{}<<"username"<<*session->user->username<<"title"<<*title<<"thread"<<open_array<<open_document<<"sender"<<*session->user->username<<"content"<<*content<<"time"<<(int64_t)time(nullptr)<<close_document<<close_array<<"closed"<<false<<"user_can_add_msg"<<false<<"identifier"<<con_id<<finalize);
-		std::string tg_notification=fmt::format("*New Contact*\nUser: `{}`\nTitle: `{}`\n\n```\n{}\n```", *session->user->username, *title, *content);
+		std::string tg_notification=fmt::format("*New Contact*\n!CONTACTID={}!\nUser: `{}`\nTitle: `{}`\n\n```\n{}\n```", con_id, *session->user->username, *title, *content);
 		std::thread([tg_notification]() {
 			httplib::Client tgClient("https://api.telegram.org");
 			Json::Value postContent;
@@ -1298,7 +1294,7 @@ namespace FBUC {
 		}
 		{
 			tg_notify:
-			std::string tg_notification=fmt::format("*Update on Contact*\nOperator: `{}`\n", *session->user->username);
+			std::string tg_notification=fmt::format("*Update on Contact*\n!CONTACTID={}!\nOperator: `{}`\n", *identifier, *session->user->username);
 			if(*anonymous&&**anonymous) {
 				tg_notification+="*ANONYMOUS MODE*\n";
 			}
@@ -2090,6 +2086,56 @@ extern "C" void init_user_center() {
 			}
 			userlist_mutex.unlock();
 			res.set_content(sessionId, "text/plain");
+		});
+		server.Get("/remote_auth", [&](const httplib::Request& req, httplib::Response& res) {
+			if(!req.has_header("X-Auth-HttpRequest-Query")) {
+				res.status=403;
+				res.set_content("403 Please Reject", "text/plain");
+				return;
+			}
+			std::string query_val=req.get_header_value("X-Auth-HttpRequest-Query");
+			std::regex secret_regex("(^|&)secret=(.*?)(&|$)", std::regex_constants::ECMAScript);
+			std::smatch secret_match;
+			if(!std::regex_search(query_val, secret_match, secret_regex)) {
+				res.status=403;
+				res.set_content("403 Please Reject", "text/plain");
+				return;
+			}
+			std::string const& secret_val=secret_match[2].str();
+			if(!userlist.contains(secret_val)) {
+				res.status=403;
+				res.set_content("403 Please Reject", "text/plain");
+				return;
+			}
+			std::shared_ptr<FBUC::UserSession> session=userlist[secret_val];
+			if(!session->user||(req.has_param("admin")&&!*session->user->isAdministrator)) {
+				res.status=403;
+				res.set_content("403 Please Reject", "text/plain");
+				return;
+			}
+			res.set_header("Auth-User", session->user->username);
+		});
+		server.Post("/api/telegram/webhook", [&](const httplib::Request& req, httplib::Response& res) {
+			if(!req.has_header("X-Telegram-Bot-Api-Secret-Token")&&req.get_header_value("X-Telegram-Bot-Api-Secret-Token")!=Secrets::get_telegram_webhook_secret()) {
+				res.status=400;
+				res.set_content("Illegal request", "text/plain");
+				return;
+			}
+			Json::Value parsed_req;
+			Utils::parseJSON(req.body, &parsed_req);
+			if(parsed_req["message"].isMember("reply_to_message")) {
+				std::string reply_text=parsed_req["message"]["text"].asString();
+				if(memcmp(reply_text.c_str(), "/reply\n", 7)==0) {
+					std::string original=parsed_req["message"]["reply_to_message"]["text"].asString();
+					std::regex contact_id_regex("!CONTACTID=(\\d+)!", std::regex_constants::ECMAScript);
+					std::smatch contact_id_match;
+					if(!std::regex_search(original, contact_id_match, contact_id_regex)) {
+						return;
+					}
+					std::string contact_id_str=contact_id_match[1].str();
+					
+				}
+			}
 		});
 		server.Post("/api/stripe/webhook", [&](const httplib::Request& req, httplib::Response& res) {
 			if(!req.has_header("Stripe-Signature")) {

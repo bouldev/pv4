@@ -13,3 +13,4 @@ pv4-aarch64
 *.so
 *.o
 modules/private
+modules.json

@@ -41,6 +41,10 @@ public:
 	static int64_t get_telegram_chat_id() {
 		return -0;
 	}
+	
+	static std::string get_telegram_webhook_secret() {
+		return "123";
+	}
 };
 
 const unsigned char *_fbtoken_iv=(unsigned char*)"1234567890abcdef";
