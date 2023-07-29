@@ -2182,30 +2182,6 @@ extern "C" void init_user_center() {
 			Json::Value &session=event["data"]["object"];
 			if(event_type=="charge.succeeded") {
 				return;
-				payments_mutex.lock_shared();
-				if(!payment_intents.contains(session["id"].asString())) {
-					payments_mutex.unlock_shared();
-					return;
-				}
-				std::string p_type=session["payment_method_details"]["type"].asString();
-				if(session["payment_method_details"][p_type]["fingerprint"].isString()) {
-					std::string const& fingerprint=session["payment_method_details"][p_type]["fingerprint"].asString();
-					auto ptr=payment_intents[session["id"].asString()];
-					auto possibleSession=ptr->session.lock();
-					if(possibleSession) {
-						if(!possibleSession->user->payment_verify_fingerprint.has_value()) {
-							auto client=mongodb_pool.acquire();
-							auto dup=(*client)["fastbuilder"]["whitelist"].find_one(document{}<<"payment_verify_fingerprint"<<fingerprint<<finalize);
-							if(dup.has_value()) {
-								possibleSession->user->banned_from_payment=true;
-							}else{
-								possibleSession->user->payment_verify_fingerprint=fingerprint;
-							}
-						}
-					}
-				}
-				payments_mutex.unlock_shared();
-				return;
 			}
 			payments_mutex.lock_shared();
 			if(!payment_intents.contains(session["id"].asString())) {

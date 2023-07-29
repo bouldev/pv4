@@ -109,6 +109,9 @@ int main() {
 	register_general_sighandlers();
 	SPDLOG_DEBUG("signal handlers registered");
 	Modules::loadModules();
-	pthread_exit(0);
+	while(1) {
+		sleep(3600);
+	}
+	//pthread_exit(0);
 	return 0;
 }
