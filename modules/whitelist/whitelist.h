@@ -18,8 +18,17 @@ namespace FBWhitelist {
 	template<typename T, typename DT=T>
 	class RentalServerDBValue;
 	
+	class DBObject {
+	protected:
+		virtual void load(std::shared_ptr<std::string>, bsoncxx::document::view) = 0;
+		
+		friend class User;
+		friend class Whitelist;
+		friend class RentalServerStore;
+	};
+	
 	template<typename T, typename DT=T>
-	class DBValue {
+	class DBValue : DBObject {
 	protected:
 		std::shared_ptr<std::mutex> w_lock=std::make_shared<std::mutex>();
 		std::shared_ptr<std::shared_ptr<T>> object;
@@ -28,12 +37,10 @@ namespace FBWhitelist {
 		
 		void _set(T const& target);
 		DBValue(const char *_in) : item_name(_in) {};
-		DBValue(const char *item_name, std::shared_ptr<std::string> identifier, T const& item);
-		DBValue(const char *item_name, std::shared_ptr<std::string> identifier);
-		DBValue(const char *item_name, std::shared_ptr<std::string> identifier, bsoncxx::document::view db_view);
-		
+
 		DBValue() {}
-		virtual void load(std::shared_ptr<std::string> identifier, bsoncxx::document::view db_view);
+		~DBValue() = default;
+		virtual void load(std::shared_ptr<std::string> identifier, bsoncxx::document::view db_view) override;
 	public:
 		virtual void set(T const& target);
 		virtual void unset();
@@ -59,11 +66,15 @@ namespace FBWhitelist {
 	private:
 		std::string slotid;
 	protected:
-		RentalServerDBValue(const char *item_name, std::shared_ptr<std::string> identifier, std::string slotid, T const& item) : DBValue<T, DT>(item_name, identifier, item), slotid(slotid) {}
-		RentalServerDBValue(const char *item_name, std::shared_ptr<std::string> identifier, std::string slotid) : DBValue<T, DT>(item_name, identifier), slotid(slotid) {}
-		RentalServerDBValue(const char *item_name, std::shared_ptr<std::string> identifier, std::string slotid, bsoncxx::array::element const& db_view) : DBValue<T, DT>(item_name, identifier, db_view.get_document()), slotid(slotid) {}
-		
+		RentalServerDBValue(const char *item_name) : DBValue<T, DT>(item_name) {}
+
 		RentalServerDBValue() {}
+		virtual ~RentalServerDBValue()=default;
+		
+		virtual void load(std::shared_ptr<std::string> identifier, std::string const &slotid, bsoncxx::document::view db_view) {
+			this->slotid=slotid;
+			DBValue<T, DT>::load(identifier, db_view);
+		}
 	public:
 		virtual void set(T const& target);
 		virtual void unset();
@@ -87,17 +98,19 @@ namespace FBWhitelist {
 	private:
 		bool is_valid;
 	public:
-		RentalServerDBValue<std::string> content="content";
+		RentalServerDBValue<std::string> content="sid";
 		RentalServerDBValue<std::string> slotid="slotid";
 		RentalServerDBValue<uint64_t, int64_t> lastdate="lastdate";
 		RentalServerDBValue<bool> locked="locked";
 		
 		operator bool() const;
+		inline RentalServerDBValue<bool> *begin() { return (RentalServerDBValue<bool> *)&content; };
+		inline RentalServerDBValue<bool> *end() { return (&locked)+1; };
 		friend class RentalServerStore;
 		friend class Whitelist;
 	};
 	
-	class RentalServerStore {
+	class RentalServerStore : DBObject {
 		static RentalServerItem InvalidRentalServer;
 	
 		std::shared_ptr<std::string> username;
@@ -105,6 +118,9 @@ namespace FBWhitelist {
 		std::shared_ptr<std::unordered_map<std::string, RentalServerItem>> rentalServerMap=std::make_shared<std::unordered_map<std::string, RentalServerItem>>();
 	
 		RentalServerStore()=default;
+		~RentalServerStore()=default;
+	protected:
+		virtual void load(std::shared_ptr<std::string>, bsoncxx::document::view);
 	public:
 		std::unordered_map<std::string, RentalServerItem>::const_iterator begin() const;
 		std::unordered_map<std::string, RentalServerItem>::const_iterator end() const;
@@ -159,6 +175,9 @@ namespace FBWhitelist {
 		DBValue<std::string> two_factor_authentication_secret="two_factor_authentication_secret";
 		std::shared_ptr<uint32_t> rate_limit_counter=std::make_shared<uint32_t>(0);
 		std::shared_ptr<bool> keep_reference=std::make_shared<bool>(false);
+	
+		inline DBValue<bool> *begin() { return (DBValue<bool> *)&username; };
+		inline DBValue<bool> *end() { return (DBValue<bool> *)&rate_limit_counter; };
 	};
 
 	class Whitelist {

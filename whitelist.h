@@ -19,8 +19,13 @@ namespace FBWhitelist {
 	template<typename T, typename DT=T>
 	class RentalServerDBValue;
 	
+	class DBObject {
+	protected:
+		virtual void _anonymous_DBObject_1(){};
+	};
+	
 	template<typename T, typename DT=T>
-	class DBValue {
+	class DBValue : DBObject {
 	protected:
 		std::shared_ptr<void> private_1;
 		std::shared_ptr<void> private_2;
@@ -87,14 +92,13 @@ namespace FBWhitelist {
 		friend class Whitelist;
 	};
 	
-	class RentalServerStore {
-		static RentalServerItem InvalidRentalServer;
+	class RentalServerStore : DBObject {
+		std::shared_ptr<void> private_1;
+		std::shared_ptr<void> private_2;
+		std::shared_ptr<void> private_3;
 	
-		std::shared_ptr<std::string> username;
-		std::shared_ptr<std::mutex> write_mutex=std::make_shared<std::mutex>();
-		std::shared_ptr<std::unordered_map<std::string, RentalServerItem>> rentalServerMap=std::make_shared<std::unordered_map<std::string, RentalServerItem>>();
-	
-		RentalServerStore()=default;
+		RentalServerStore();
+		~RentalServerStore();
 	public:
 		std::unordered_map<std::string, RentalServerItem>::const_iterator begin() const;
 		std::unordered_map<std::string, RentalServerItem>::const_iterator end() const;
@@ -113,12 +117,12 @@ namespace FBWhitelist {
 	};
 	
 	struct SigningKeyPair {
-		bsoncxx::document::value stored_doc_value = bsoncxx::builder::stream::document{}<<bsoncxx::builder::stream::finalize;
+		bsoncxx::document::value stored_doc_value;
 	
 		std::string private_key;
 		std::string public_key;
 	
-		SigningKeyPair()=default;
+		SigningKeyPair();
 		SigningKeyPair(bsoncxx::document::element const& db_item);
 		operator bsoncxx::document::view();
 		bool operator==(FBWhitelist::SigningKeyPair const& value) const;
