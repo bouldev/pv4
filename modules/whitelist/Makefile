@@ -8,7 +8,7 @@ normal: libpv4-whitelist.so
 all: libpv4-whitelist.so libpv4-aarch64-whitelist.so
 
 libpv4-whitelist.so: *.cpp *.h
-	g++ --std=c++20 whitelist.cpp \
+	g++ --std=c++20 -g whitelist.cpp \
 		-I../../mongodb/mongo-cxx-driver/src/ -I../../depends/mongo-cxx-driver/src/ \
 		-I../../jsoncpp/include -I../../fmt/include -I../../spdlog/include \
 		-DSPDLOG_FMT_EXTERNAL -DSPDLOG_NO_THREAD_ID \

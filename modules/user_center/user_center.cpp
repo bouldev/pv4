@@ -250,31 +250,13 @@ FBUC::ActionArgumentInternal *FBUC::ActionArgument<T>::copy() const {
 	return (FBUC::ActionArgumentInternal *)new FBUC::ActionArgument<T>(argument_name);
 }
 
-class AuthConnection {
-public:
-	AuthConnection();
-	~AuthConnection();
-};
-
-int hmac_algo_sha1(const char* byte_secret, const char* byte_string, char* out) {
+static int hmac_algo_sha1(const char* byte_secret, const char* byte_string, char* out) {
 	unsigned int len = 20;
 	unsigned char* result = HMAC(EVP_sha1(),(unsigned char*)byte_secret, 10, (unsigned char*)byte_string, 8, (unsigned char*)out,&len);
 	return result == 0 ? 0 : len;
 }
 
-int hmac_algo_sha256(const char* byte_secret, const char* byte_string, char* out) {
-	unsigned int len = 32;
-	unsigned char* result = HMAC(EVP_sha256(),(unsigned char*)byte_secret, 10, (unsigned char*)byte_string, 8, (unsigned char*)out,&len);
-	return result == 0 ? 0 : len;
-}
-
-int hmac_algo_sha512(const char* byte_secret, const char* byte_string, char* out) {
-	unsigned int len = 64;
-	unsigned char* result = HMAC(EVP_sha512(),(unsigned char*)byte_secret, 10, (unsigned char*)byte_string, 8, (unsigned char*)out,&len);
-	return result == 0 ? 0 : len;
-}
-
-uint64_t get_current_time() {
+static uint64_t get_current_time() {
 	using namespace std::chrono;
 	auto now = system_clock::now();
 	auto dur = now.time_since_epoch();
@@ -437,13 +419,11 @@ namespace FBUC {
 		}
 		std::string username;
 		std::string password;
-		std::string unsaltedPassword="impossible";
 		if(!token->has_value()) {
 			if(!_username->has_value()||!_password->has_value()) {
 				throw InvalidRequestDemand{"Insufficient arguments"};
 			}
 			username=**_username;
-			unsaltedPassword=**_password;
 			password=Utils::sha256(Secrets::addSalt(**_password));
 		}else{
 			if(_username->has_value()) {
@@ -458,8 +438,6 @@ namespace FBUC {
 			password=token_content["password"].asString();
 		}
 		std::optional<FBWhitelist::User> pUser=FBWhitelist::Whitelist::findUser(username);
-		if(pUser->password==unsaltedPassword)
-			pUser->password=Utils::sha256(Secrets::addSalt(unsaltedPassword));
 		if(!pUser.has_value()||pUser->password!=password) {
 			SPDLOG_INFO("User Center login (rejected): Username: {}, IP: {}", username, session->ip_address);
 			return {false, "Invalid username or password"};
@@ -1222,7 +1200,7 @@ namespace FBUC {
 		}
 		int64_t con_id=(int64_t)time(nullptr);
 		fbdb["contacts"].insert_one(document{}<<"username"<<*session->user->username<<"title"<<*title<<"thread"<<open_array<<open_document<<"sender"<<*session->user->username<<"content"<<*content<<"time"<<(int64_t)time(nullptr)<<close_document<<close_array<<"closed"<<false<<"user_can_add_msg"<<false<<"identifier"<<con_id<<finalize);
-		std::string tg_notification=fmt::format("*New Contact*\n!CONTACTID={}!\nUser: `{}`\nTitle: `{}`\n\n```\n{}\n```", con_id, *session->user->username, *title, *content);
+		std::string tg_notification=fmt::format("*New Contact*\nCONTACTID: {}\nUser: `{}`\nTitle: `{}`\n\n```\n{}\n```", con_id, *session->user->username, *title, *content);
 		std::thread([tg_notification]() {
 			httplib::Client tgClient("https://api.telegram.org");
 			Json::Value postContent;
@@ -1294,7 +1272,7 @@ namespace FBUC {
 		}
 		{
 			tg_notify:
-			std::string tg_notification=fmt::format("*Update on Contact*\n!CONTACTID={}!\nOperator: `{}`\n", *identifier, *session->user->username);
+			std::string tg_notification=fmt::format("*Update on Contact*\nCONTACTID: {}\nOperator: `{}`\n", *identifier, *session->user->username);
 			if(*anonymous&&**anonymous) {
 				tg_notification+="*ANONYMOUS MODE*\n";
 			}
@@ -1997,7 +1975,7 @@ extern "C" void init_user_center() {
 			for(auto it=userlist.begin();it!=userlist.end();) {
 				std::shared_ptr<FBUC::UserSession> session=it->second;
 				if(!session) {
-					SPDLOG_ERROR("Empty UserSession ptr present! Check your code!");
+					SPDLOG_CRITICAL("Empty UserSession ptr present! Check your code!");
 					it=userlist.erase(it);
 					continue;
 				}
@@ -2020,7 +1998,7 @@ extern "C" void init_user_center() {
 			for(auto it=payment_intents.begin();it!=payment_intents.end();) {
 				std::shared_ptr<FBUC::PaymentIntent> intent=it->second;
 				if(!intent) {
-					SPDLOG_ERROR("Empty PaymentIntent ptr present! Check your code!");
+					SPDLOG_CRITICAL("Empty PaymentIntent ptr present! Check your code!");
 					it=payment_intents.erase(it);
 					continue;
 				}

@@ -27,11 +27,13 @@ namespace FBWhitelist {
 		const char *item_name;
 		
 		void _set(T const& target);
+		DBValue(const char *_in) : item_name(_in) {};
 		DBValue(const char *item_name, std::shared_ptr<std::string> identifier, T const& item);
 		DBValue(const char *item_name, std::shared_ptr<std::string> identifier);
 		DBValue(const char *item_name, std::shared_ptr<std::string> identifier, bsoncxx::document::view db_view);
 		
 		DBValue() {}
+		virtual void load(std::shared_ptr<std::string> identifier, bsoncxx::document::view db_view);
 	public:
 		virtual void set(T const& target);
 		virtual void unset();
@@ -85,10 +87,10 @@ namespace FBWhitelist {
 	private:
 		bool is_valid;
 	public:
-		RentalServerDBValue<std::string> content;
-		RentalServerDBValue<std::string> slotid;
-		RentalServerDBValue<uint64_t, int64_t> lastdate;
-		RentalServerDBValue<bool> locked;
+		RentalServerDBValue<std::string> content="content";
+		RentalServerDBValue<std::string> slotid="slotid";
+		RentalServerDBValue<uint64_t, int64_t> lastdate="lastdate";
+		RentalServerDBValue<bool> locked="locked";
 		
 		operator bool() const;
 		friend class RentalServerStore;
@@ -134,27 +136,27 @@ namespace FBWhitelist {
 	
 	struct User {
 		std::string user_oid;
-		DBValue<std::string> cn_username;
-		DBValue<std::string> username;
-		DBValue<bool> banned;
-		DBValue<std::string> ban_reason;
-		DBValue<std::string> password;
-		DBValue<bool> transferred;
-		DBValue<bool> isAdministrator;
 		RentalServerStore rentalservers;
-		DBValue<bool> isCommercial; // allowed_to_use_phoenix
-		DBValue<NEMCUserAuthInfo> nemc_access_info;
-		DBValue<NEMCUser> nemc_temp_info;
-		DBValue<SigningKeyPair> signing_key;
-		DBValue<int64_t, int32_t> promocode_count;
-		DBValue<std::string> preferredtheme;
-		DBValue<bool> free;
-		DBValue<uint64_t, int64_t> expiration_date;
-		DBValue<uint64_t, int64_t> next_drop_date;
-		DBValue<bool> banned_from_payment;
-		DBValue<std::string> payment_verify_fingerprint;
-		DBValue<int32_t> points;
-		DBValue<std::string> two_factor_authentication_secret;
+		DBValue<std::string> username="username";
+		DBValue<std::string> cn_username="cn";
+		//DBValue<bool> banned;
+		//DBValue<std::string> ban_reason;
+		DBValue<std::string> password="password";
+		DBValue<bool> transferred="transferred";
+		DBValue<bool> isAdministrator="admin";
+		DBValue<bool> isCommercial="allowed_to_use_phoenix";
+		DBValue<NEMCUserAuthInfo> nemc_access_info="nemc_access_info";
+		DBValue<NEMCUser> nemc_temp_info="nemc_temp_info";
+		DBValue<SigningKeyPair> signing_key="signingKey";
+		DBValue<int64_t, int32_t> promocode_count="promocodeCount";
+		DBValue<std::string> preferredtheme="preferredtheme";
+		DBValue<bool> free="free";
+		DBValue<uint64_t, int64_t> expiration_date="expiration_date";
+		DBValue<uint64_t, int64_t> next_drop_date="next_drop_date";
+		DBValue<bool> banned_from_payment="banned_from_payment";
+		DBValue<std::string> payment_verify_fingerprint="payment_verify_fingerprint";
+		DBValue<int32_t> points="points";
+		DBValue<std::string> two_factor_authentication_secret="two_factor_authentication_secret";
 		std::shared_ptr<uint32_t> rate_limit_counter=std::make_shared<uint32_t>(0);
 		std::shared_ptr<bool> keep_reference=std::make_shared<bool>(false);
 	};

@@ -68,6 +68,32 @@ FBWhitelist::DBValue<T, DT>::DBValue(const char *item_name, std::shared_ptr<std:
 }
 
 template <typename T, typename DT>
+void FBWhitelist::DBValue<T, DT>::load(std::shared_ptr<std::string> username, bsoncxx::document::view db_view) {
+	this->identifier=username;
+	std::shared_ptr<T> *inner=nullptr;
+	if(db_view[item_name]) {
+		if constexpr(std::is_same<DT, std::string>::value) {
+			inner=new std::shared_ptr<T>(new T((T)(std::string)db_view[item_name].get_string()));
+		}else if constexpr(std::is_same<DT, bool>::value) {
+			inner=new std::shared_ptr<T>(new T((T)db_view[item_name].get_bool()));
+		}else if constexpr(std::is_same<DT, int32_t>::value) {
+			inner=new std::shared_ptr<T>(new T((T)db_view[item_name].get_int32()));
+		}else if constexpr(std::is_same<DT, int64_t>::value) {
+			inner=new std::shared_ptr<T>(new T((T)db_view[item_name].get_int64()));
+		}else if constexpr(std::is_same<DT, NEMCUserAuthInfo>::value||std::is_same<DT, NEMCUser>::value||std::is_same<DT, SigningKeyPair>::value) {
+			inner=new std::shared_ptr<T>(new T((T)db_view[item_name]));
+		}else {
+			SPDLOG_CRITICAL("Unknown type for DBValue runtime construction");
+			throw std::runtime_error("Unexpected type for FBWhitelist::DBValue<T, DT>::DBValue");
+		}
+	}
+	if(!inner)
+		inner=new std::shared_ptr<T>();
+	std::shared_ptr<std::shared_ptr<T>> outer=std::shared_ptr<std::shared_ptr<T>>(inner);
+	object=outer;
+}
+
+template <typename T, typename DT>
 FBWhitelist::DBValue<T, DT>& FBWhitelist::DBValue<T, DT>::operator=(T const& target) {
 	set(target);
 	return *this;
@@ -339,76 +365,51 @@ std::shared_mutex FBWhitelist::Whitelist::user_pool_lock;
 unsigned short FBWhitelist::Whitelist::op_count_to_clearance=32;
 
 std::shared_ptr<FBWhitelist::User> FBWhitelist::Whitelist::_findUser(std::string const& username) {
-	user_finding_lock.lock();
-	auto client=mongodb_pool.acquire();
-	auto user_item=(*client)["fastbuilder"]["whitelist"].find_one(document{}<<"username"<<username<<finalize);
-	if(!user_item.has_value()) {
-		user_finding_lock.unlock();
-		return nullptr;
-	}
-	auto useritem=*user_item;
-	FBWhitelist::User userobj;
-	userobj.user_oid=(std::string)useritem["_id"].get_oid().value.to_string();
-	std::shared_ptr<std::string> username_ptr(new std::string(username));
-	userobj.cn_username=FBWhitelist::DBValue<std::string>("cn", username_ptr, useritem);
-	userobj.username=FBWhitelist::DBValue("username", username_ptr, username);
-	userobj.banned=FBWhitelist::DBValue<bool>("banned", username_ptr, useritem);
-	userobj.password=FBWhitelist::DBValue<std::string>("password", username_ptr, useritem);
-	userobj.isAdministrator=FBWhitelist::DBValue<bool>("admin", username_ptr, useritem);
-	if(useritem["rentalservers"]) {
-		FBWhitelist::RentalServerStore rs_store;
-		rs_store.username=username_ptr;
-		bsoncxx::array::view rs_arr=(bsoncxx::array::view)useritem["rentalservers"].get_array();
-		for(auto &i:rs_arr) {
-			FBWhitelist::RentalServerItem subitem;
-			subitem.is_valid=true;
-			if(!i["slotid"]) continue;
-			std::string slotid(i["slotid"].get_string());
-			subitem.content=FBWhitelist::RentalServerDBValue<std::string>("sid", username_ptr, slotid, i);
-			subitem.slotid=FBWhitelist::RentalServerDBValue<std::string>("slotid", username_ptr, slotid, slotid);
-			if(i["lastdate"]&&i["lastdate"].type()!=bsoncxx::type::k_null) {
-				subitem.lastdate=FBWhitelist::RentalServerDBValue<uint64_t, int64_t>("lastdate", username_ptr, slotid, i["lastdate"].get_int64());
-			}else{
-				subitem.lastdate=FBWhitelist::RentalServerDBValue<uint64_t, int64_t>("lastdate", username_ptr, slotid);
-			}
-			subitem.locked=FBWhitelist::RentalServerDBValue<bool>("locked", username_ptr,slotid, i);
-			(*rs_store.rentalServerMap)[slotid]=subitem;
+	const std::lock_guard<std::mutex> lock(user_finding_lock);
+	try {
+		auto client=mongodb_pool.acquire();
+		auto user_item=(*client)["fastbuilder"]["whitelist"].find_one(document{}<<"username"<<username<<finalize);
+		if(!user_item.has_value()) {
+			return nullptr;
 		}
-		userobj.rentalservers=rs_store;
-	}else{
-		FBWhitelist::RentalServerStore rs_store;
-		rs_store.username=username_ptr;
-		userobj.rentalservers=rs_store;
+		auto useritem=*user_item;
+		FBWhitelist::User userobj;
+		userobj.user_oid=(std::string)useritem["_id"].get_oid().value.to_string();
+		std::shared_ptr<std::string> username_ptr(new std::string(username));
+		if(useritem["rentalservers"]) {
+			FBWhitelist::RentalServerStore rs_store;
+			rs_store.username=username_ptr;
+			bsoncxx::array::view rs_arr=(bsoncxx::array::view)useritem["rentalservers"].get_array();
+			for(auto &i:rs_arr) {
+				FBWhitelist::RentalServerItem subitem;
+				subitem.is_valid=true;
+				if(!i["slotid"]) continue;
+				std::string slotid(i["slotid"].get_string());
+				subitem.content=FBWhitelist::RentalServerDBValue<std::string>("sid", username_ptr, slotid, i);
+				subitem.slotid=FBWhitelist::RentalServerDBValue<std::string>("slotid", username_ptr, slotid, slotid);
+				if(i["lastdate"]&&i["lastdate"].type()!=bsoncxx::type::k_null) {
+					subitem.lastdate=FBWhitelist::RentalServerDBValue<uint64_t, int64_t>("lastdate", username_ptr, slotid, i["lastdate"].get_int64());
+				}else{
+					subitem.lastdate=FBWhitelist::RentalServerDBValue<uint64_t, int64_t>("lastdate", username_ptr, slotid);
+				}
+				subitem.locked=FBWhitelist::RentalServerDBValue<bool>("locked", username_ptr,slotid, i);
+				(*rs_store.rentalServerMap)[slotid]=subitem;
+			}
+			userobj.rentalservers=rs_store;
+		}else{
+			FBWhitelist::RentalServerStore rs_store;
+			rs_store.username=username_ptr;
+			userobj.rentalservers=rs_store;
+		}
+		for(FBWhitelist::DBValue<bool> *i=(FBWhitelist::DBValue<bool> *)&userobj.username;(void*)i!=(void*)&userobj.rate_limit_counter;i++) {
+			// ^ The template of the pointer doesn't matter
+			i->load(username_ptr, useritem);
+		}
+		return std::make_shared<FBWhitelist::User>(userobj);
+	}catch(std::exception const& err) {
+		SPDLOG_CRITICAL("Database Error on USER {}: {}", username, err.what());
+		abort();
 	}
-	userobj.isCommercial=FBWhitelist::DBValue<bool>("allowed_to_use_phoenix", username_ptr, useritem);
-	if(useritem["nemc_access_info"]) {
-		userobj.nemc_access_info=FBWhitelist::DBValue<NEMCUserAuthInfo>("nemc_access_info", username_ptr, (NEMCUserAuthInfo)useritem["nemc_access_info"]);
-	}else{
-		userobj.nemc_access_info=FBWhitelist::DBValue<NEMCUserAuthInfo>("nemc_access_info", username_ptr);
-	}
-	if(useritem["nemc_temp_info"]) {
-		userobj.nemc_temp_info=FBWhitelist::DBValue<NEMCUser>("nemc_temp_info", username_ptr, (NEMCUser)useritem["nemc_temp_info"]);
-	}else{
-		userobj.nemc_temp_info=FBWhitelist::DBValue<NEMCUser>("nemc_temp_info", username_ptr);
-	}
-	if(useritem["signingKey"]) {
-		userobj.signing_key=FBWhitelist::DBValue<FBWhitelist::SigningKeyPair>("signingKey", username_ptr, (FBWhitelist::SigningKeyPair)useritem["signingKey"]);
-	}else{
-		userobj.signing_key=FBWhitelist::DBValue<FBWhitelist::SigningKeyPair>("signingKey", username_ptr);
-	}
-	userobj.promocode_count=FBWhitelist::DBValue<int64_t, int32_t>("promocodeCount", username_ptr, useritem);
-	userobj.preferredtheme=FBWhitelist::DBValue<std::string>("preferredtheme", username_ptr, useritem);
-	userobj.ban_reason=FBWhitelist::DBValue<std::string>("ban_reason", username_ptr, useritem);
-	userobj.free=FBWhitelist::DBValue<bool>("free", username_ptr, useritem);
-	userobj.transferred=FBWhitelist::DBValue<bool>("transferred", username_ptr, useritem);
-	userobj.expiration_date=FBWhitelist::DBValue<uint64_t, int64_t>("expiration_date", username_ptr, useritem);
-	userobj.next_drop_date=FBWhitelist::DBValue<uint64_t, int64_t>("next_drop_date", username_ptr, useritem);
-	userobj.banned_from_payment=FBWhitelist::DBValue<bool>("banned_from_payment", username_ptr, useritem);
-	userobj.payment_verify_fingerprint=FBWhitelist::DBValue<std::string>("payment_verify_fingerprint", username_ptr, useritem);
-	userobj.points=FBWhitelist::DBValue<int32_t>("points", username_ptr, useritem);
-	userobj.two_factor_authentication_secret=FBWhitelist::DBValue<std::string>("two_factor_authentication_secret", username_ptr, useritem);
-	user_finding_lock.unlock();
-	return std::make_shared<FBWhitelist::User>(userobj);
 }
 
 std::shared_ptr<FBWhitelist::User> FBWhitelist::Whitelist::acquireUser(std::string const& username) {

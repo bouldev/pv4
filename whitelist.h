@@ -126,14 +126,14 @@ namespace FBWhitelist {
 
 	struct User {
 		std::string user_oid;
-		DBValue<std::string> cn_username;
+		RentalServerStore rentalservers;
 		DBValue<std::string> username;
-		DBValue<bool> banned;
-		DBValue<std::string> ban_reason;
+		DBValue<std::string> cn_username;
+		//DBValue<bool> banned;
+		//DBValue<std::string> ban_reason;
 		DBValue<std::string> password;
 		DBValue<bool> transferred;
 		DBValue<bool> isAdministrator;
-		RentalServerStore rentalservers;
 		DBValue<bool> isCommercial; // allowed_to_use_phoenix
 		DBValue<NEMCUserAuthInfo> nemc_access_info;
 		DBValue<NEMCUser> nemc_temp_info;
