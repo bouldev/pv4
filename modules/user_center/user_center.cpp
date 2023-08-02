@@ -1674,10 +1674,16 @@ namespace FBUC {
 				SPDLOG_INFO("Phoenix login (rejected): {} -> {} [unauthorized server code] IP: {}", *user->username, *server_code, session->ip_address);
 				return {false, "指定的租赁服号未授权，请前往用户中心设置", "translation", 13};
 			}
-			(*user->rate_limit_counter)++;
-			if(*user->rate_limit_counter>=RATE_LIMIT_VALUE) {
-				SPDLOG_INFO("Phoenix login (rejected): {} -> {} [RATE LIMIT] IP: {}", *user->username, *server_code, session->ip_address);
-				return {false, "[RATE LIMIT] 您的请求过于频繁，现已被限制使用，请稍等一段时间或前往用户中心输入验证码解除限制。"};
+			time_t current_time=time(nullptr);
+			struct tm local_time;
+			localtime_r(&current_time, &local_time);
+			// Rate limit from 8 a.m. to 3 p.m. PT
+			if(local_time.tm_hour>=8&&local_time.tm_hour<=14) {
+				(*user->rate_limit_counter)++;
+				if(*user->rate_limit_counter>=RATE_LIMIT_VALUE) {
+					SPDLOG_INFO("Phoenix login (rejected): {} -> {} [RATE LIMIT] IP: {}", *user->username, *server_code, session->ip_address);
+					return {false, "[RATE LIMIT] 您的请求过于频繁，现已被限制使用，请稍等一段时间或前往用户中心输入验证码解除限制。"};
+				}
 			}
 		}
 		NEMCUser nemcUser;
