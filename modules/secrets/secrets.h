@@ -30,10 +30,6 @@ public:
 		return "whsec_";
 	}
 	
-	static std::string get_openai_token() {
-		return "sk-";
-	}
-	
 	static std::string get_telegram_bot_token() {
 		return "bot:";
 	}

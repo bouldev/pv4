@@ -41,7 +41,6 @@ using bsoncxx::builder::stream::open_document;
 extern mongocxx::pool mongodb_pool;
 
 static httplib::Client stripeClient("https://api.stripe.com");
-static httplib::Client openaiClient("https://api.openai.com");
 std::string get_check_num(std::string const& data);
 
 struct OTPDataPack {
@@ -269,6 +268,8 @@ namespace FBUC {
 		std::string error_message;
 		ErrorDemand(std::string const& error_message) {
 			this->error_message=error_message;
+			stack_dump="(OMITTED)";
+			return;
 			void *addrlist[64];
 			int addrlen=backtrace(addrlist, 64);
 			if(!addrlen) {
@@ -1174,30 +1175,6 @@ namespace FBUC {
 		}else if(title->length()>32) {
 			return {false, "标题太长"};
 		}
-		Json::Value openai_request;
-		openai_request["model"]="gpt-3.5-turbo";
-		Json::Value messages_arr(Json::arrayValue);
-		Json::Value first_system_notice;
-		first_system_notice["role"]="system";
-		first_system_notice["content"]="You should make sure the content is not harmful, and is either in English, Japanese or Chinese, and human-readable.\nContent should also be detailed and formal like user contacts, describing what problem they are having, unrelated content like \"test\" should be rejected.\nIf the requirements do not met, reply with \"REJECT\", elsewhere reply \"PASS\".";
-		messages_arr.append(first_system_notice);
-		Json::Value second_part;
-		second_part["role"]="user";
-		second_part["content"]=fmt::format("Title: {}\nContent: {}", *title, *content);
-		messages_arr.append(second_part);
-		openai_request["messages"]=messages_arr;
-		auto openai_response=openaiClient.Post("/v1/chat/completions", Utils::writeJSON(openai_request), "application/json");
-		if(!openai_response||openai_response->status!=200) {
-			throw ServerErrorDemand{"OpenAI Request Failed"};
-		}
-		Json::Value openai_parsed;
-		Utils::parseJSON(openai_response->body, &openai_parsed);
-		std::string const& order=openai_parsed["choices"][0]["message"]["content"].asString();
-		if(order=="REJECT") {
-			return {false, "经检测，你的联络不包括有效信息，已被阻止发送。"};
-		}else if(order=="HARMFUL") {
-			return {false, "经检测，你的联络包含有害内容，已被阻止发送。"};
-		}
 		int64_t con_id=(int64_t)time(nullptr);
 		fbdb["contacts"].insert_one(document{}<<"username"<<*session->user->username<<"title"<<*title<<"thread"<<open_array<<open_document<<"sender"<<*session->user->username<<"content"<<*content<<"time"<<(int64_t)time(nullptr)<<close_document<<close_array<<"closed"<<false<<"user_can_add_msg"<<false<<"identifier"<<con_id<<finalize);
 		std::string tg_notification=fmt::format("*New Contact*\nCONTACTID: {}\nUser: `{}`\nTitle: `{}`\n\n```\n{}\n```", con_id, *session->user->username, *title, *content);
@@ -1234,30 +1211,6 @@ namespace FBUC {
 			}
 			if(!r_contact_item["user_can_add_msg"].get_bool()) {
 				return {false, "请等待回复"};
-			}
-			Json::Value openai_request;
-			openai_request["model"]="gpt-3.5-turbo";
-			Json::Value messages_arr(Json::arrayValue);
-			Json::Value first_system_notice;
-			first_system_notice["role"]="system";
-			first_system_notice["content"]="You should make sure the content is not harmful, and is either in English, Japanese or Chinese, and human-readable.\nContent should also be detailed and formal like user contacts, describing what problem they are having, unrelated content like \"test\" should be rejected.\nIf the requirements do not met, reply with \"REJECT\", elsewhere reply \"PASS\".";
-			messages_arr.append(first_system_notice);
-			Json::Value second_part;
-			second_part["role"]="user";
-			second_part["content"]=fmt::format("Content: {}", *content);
-			messages_arr.append(second_part);
-			openai_request["messages"]=messages_arr;
-			auto openai_response=openaiClient.Post("/v1/chat/completions", Utils::writeJSON(openai_request), "application/json");
-			if(!openai_response||openai_response->status!=200) {
-				throw ServerErrorDemand{"OpenAI Request Failed"};
-			}
-			Json::Value openai_parsed;
-			Utils::parseJSON(openai_response->body, &openai_parsed);
-			std::string const& order=openai_parsed["choices"][0]["message"]["content"].asString();
-			if(order=="REJECT") {
-				return {false, "经检测，你的联络不包括有效信息，已被阻止发送。"};
-			}else if(order=="HARMFUL") {
-				return {false, "经检测，你的联络包含有害内容，已被阻止发送。"};
 			}
 			fbdb["contacts"].update_one(document{}<<"identifier"<<*identifier<<finalize, document{}<<"$push"<<open_document<<"thread"<<open_document<<"content"<<*content<<"sender"<<*session->user->username<<"time"<<(int64_t)time(nullptr)<<close_document<<close_document<<"$set"<<open_document<<"user_can_add_msg"<<false<<close_document<<finalize);
 			goto tg_notify;
@@ -1674,15 +1627,17 @@ namespace FBUC {
 				SPDLOG_INFO("Phoenix login (rejected): {} -> {} [unauthorized server code] IP: {}", *user->username, *server_code, session->ip_address);
 				return {false, "指定的租赁服号未授权，请前往用户中心设置", "translation", 13};
 			}
-			time_t current_time=time(nullptr);
-			struct tm local_time;
-			localtime_r(&current_time, &local_time);
-			// Rate limit from 8 a.m. to 3 p.m. PT
-			if(local_time.tm_hour>=8&&local_time.tm_hour<=14) {
-				(*user->rate_limit_counter)++;
-				if(*user->rate_limit_counter>=RATE_LIMIT_VALUE) {
-					SPDLOG_INFO("Phoenix login (rejected): {} -> {} [RATE LIMIT] IP: {}", *user->username, *server_code, session->ip_address);
-					return {false, "[RATE LIMIT] 您的请求过于频繁，现已被限制使用，请稍等一段时间或前往用户中心输入验证码解除限制。"};
+			if(false) {
+				time_t current_time=time(nullptr);
+				struct tm local_time;
+				localtime_r(&current_time, &local_time);
+				// Rate limit from 7 a.m. to 3 p.m. PT
+				if(local_time.tm_hour>=8&&local_time.tm_hour<=14) {
+					(*user->rate_limit_counter)++;
+					if(*user->rate_limit_counter>=RATE_LIMIT_VALUE) {
+						SPDLOG_INFO("Phoenix login (rejected): {} -> {} [RATE LIMIT] IP: {}", *user->username, *server_code, session->ip_address);
+						return {false, "[RATE LIMIT] 您的请求过于频繁，现已被限制使用，请稍等一段时间或前往用户中心输入验证码解除限制。"};
+					}
 				}
 			}
 		}
@@ -1971,8 +1926,6 @@ static void FBUC::enter_action_clust(FBUC::Action *action, Json::Value& parsed_a
 extern "C" void init_user_center() {
 	stripeClient.set_keep_alive(true);
 	stripeClient.set_bearer_token_auth(Secrets::get_stripe_key());
-	openaiClient.set_keep_alive(true);
-	openaiClient.set_bearer_token_auth(Secrets::get_openai_token());
 	std::thread([](){
 		while(1) {
 			sleep(120);
@@ -2186,52 +2139,53 @@ extern "C" void init_user_center() {
 			}
 			FBUC::finalizePaymentIntent(intent, user->user.get(), fmt::format("@Stripe+{}", session["id"].asString()));
 		});
-		for(auto const& i:fbuc_actions) {
-			server.Options(fmt::format("/api/{}",i.second->action_name), [&](const httplib::Request& req, httplib::Response& res) {
-				res.status=204;
-			});
-			server.Get(fmt::format("/api/{}",i.second->action_name), [&](const httplib::Request& req, httplib::Response& res) {
-				Json::Value parsed_args;
-				for(const auto &i:req.params) {
-					parsed_args[i.first]=i.second;
-				}
-				enter_action_clust(i.second, parsed_args, req, res);
-			});
-			server.Post(fmt::format("/api/{}",i.second->action_name), [&](const httplib::Request& req, httplib::Response& res) {
-				Json::Value parsed_args;
-				std::string error_message;
-				bool isSucc=Utils::parseJSON(req.body, &parsed_args, &error_message);
-				if(!isSucc) {
-					res.status=400;
-					res.set_content(fmt::format("400 Invalid Request\n\nExpected JSON data, where JSON parsing failed.\n\nError: {}", error_message), "text/plain");
-					return;
-				}
-				enter_action_clust(i.second, parsed_args, req, res);
-			});
-		}
-		for(auto const& i:fbuc_administrative_actions) {
-			server.Options(fmt::format("/api/administrative/{}",i.second->action_name), [&](const httplib::Request& req, httplib::Response& res) {
-				res.status=204;
-			});
-			server.Get(fmt::format("/api/administrative/{}",i.second->action_name), [&](const httplib::Request& req, httplib::Response& res) {
-				Json::Value parsed_args;
-				for(const auto &i:req.params) {
-					parsed_args[i.first]=i.second;
-				}
-				enter_action_clust(i.second, parsed_args, req, res, true);
-			});
-			server.Post(fmt::format("/api/administrative/{}",i.second->action_name), [&](const httplib::Request& req, httplib::Response& res) {
-				Json::Value parsed_args;
-				std::string error_message;
-				bool isSucc=Utils::parseJSON(req.body, &parsed_args, &error_message);
-				if(!isSucc) {
-					res.status=400;
-					res.set_content(fmt::format("400 Invalid Request\n\nExpected JSON data, where JSON parsing failed.\n\nError: {}", error_message), "text/plain");
-					return;
-				}
-				enter_action_clust(i.second, parsed_args, req, res, true);
-			});
-		}
+		server.Options(R"(/api/(administrative/)?([a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
+			res.status=204;
+		});
+		server.Get(R"(/api/(administrative/)?([a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
+			if(!req.matches[2].length()) {
+				res.status=404;
+				return;
+			}
+			FBUC::Action *action=nullptr;
+			bool isAdministrative=req.matches[1].length()!=0;
+			std::unordered_map<std::string, FBUC::Action *> &target_map=isAdministrative?fbuc_administrative_actions:fbuc_actions;
+			if(!target_map.contains(req.matches[2].str())) {
+				res.status=404;
+				return;
+			}else{
+				action=target_map[req.matches[2].str()];
+			}
+			Json::Value parsed_args;
+			for(const auto &i:req.params) {
+				parsed_args[i.first]=i.second;
+			}
+			enter_action_clust(action, parsed_args, req, res, isAdministrative);
+		});
+		server.Post(R"(/api/(administrative/)?([a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
+			if(!req.matches[2].length()) {
+				res.status=404;
+				return;
+			}
+			FBUC::Action *action=nullptr;
+			bool isAdministrative=req.matches[1].length()!=0;
+			std::unordered_map<std::string, FBUC::Action *> &target_map=isAdministrative?fbuc_administrative_actions:fbuc_actions;
+			if(!target_map.contains(req.matches[2].str())) {
+				res.status=404;
+				return;
+			}else{
+				action=target_map[req.matches[2].str()];
+			}
+			Json::Value parsed_args;
+			std::string error_message;
+			bool isSucc=Utils::parseJSON(req.body, &parsed_args, &error_message);
+			if(!isSucc) {
+				res.status=400;
+				res.set_content(fmt::format("400 Invalid Request\n\nExpected JSON data, where JSON parsing failed.\n\nError: {}", error_message), "text/plain");
+				return;
+			}
+			enter_action_clust(action, parsed_args, req, res);
+		});
 		server.set_post_routing_handler([](const auto& req, auto& res) {
 			res.set_header("access-control-allow-credentials", "true");
 			res.set_header("access-control-allow-headers", "Origin, Authorization, Accept, Content-Type, Cookie");
