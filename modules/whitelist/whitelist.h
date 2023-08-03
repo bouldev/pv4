@@ -67,9 +67,12 @@ namespace FBWhitelist {
 		std::string slotid;
 	protected:
 		RentalServerDBValue(const char *item_name) : DBValue<T, DT>(item_name) {}
-
+		
 		RentalServerDBValue() {}
+		#pragma GCC push_options
+		#pragma GCC optimize("O0")
 		virtual ~RentalServerDBValue()=default;
+		#pragma GCC pop_options
 		
 		virtual void load(std::shared_ptr<std::string> identifier, std::string const &slotid, bsoncxx::document::view db_view) {
 			this->slotid=slotid;
@@ -116,9 +119,12 @@ namespace FBWhitelist {
 		std::shared_ptr<std::string> username;
 		std::shared_ptr<std::mutex> write_mutex=std::make_shared<std::mutex>();
 		std::shared_ptr<std::unordered_map<std::string, RentalServerItem>> rentalServerMap=std::make_shared<std::unordered_map<std::string, RentalServerItem>>();
-	
+		
+		#pragma GCC push_options
+		#pragma GCC optimize("O0")
 		RentalServerStore()=default;
 		~RentalServerStore()=default;
+		#pragma GCC pop_options
 	protected:
 		virtual void load(std::shared_ptr<std::string>, bsoncxx::document::view);
 	public:
@@ -143,8 +149,12 @@ namespace FBWhitelist {
 	
 		std::string private_key;
 		std::string public_key;
-	
+		
+		
+		#pragma GCC push_options
+		#pragma GCC optimize("O0")
 		SigningKeyPair()=default;
+		#pragma GCC pop_options
 		SigningKeyPair(bsoncxx::document::element const& db_item);
 		operator bsoncxx::document::view();
 		bool operator==(FBWhitelist::SigningKeyPair const& value) const;
