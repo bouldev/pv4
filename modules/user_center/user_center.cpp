@@ -29,8 +29,6 @@
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/builder/stream/array.hpp>
 
-#define RATE_LIMIT_VALUE 16
-
 using bsoncxx::builder::stream::close_array;
 using bsoncxx::builder::stream::close_document;
 using bsoncxx::builder::stream::document;
@@ -530,7 +528,7 @@ namespace FBUC {
 		}else{
 			mp_duration=round(((session->user->expiration_date-time(nullptr))/86400.00)*100.0)/100.0;
 		}
-		return {true, "Well done", "blc", blc, "cn_username", cn_username, "slots", slots, "is_2fa", is_2fa, "monthly_plan_duration", mp_duration, "is_rate_limited", *session->user->rate_limit_counter>=RATE_LIMIT_VALUE};
+		return {true, "Well done", "blc", blc, "cn_username", cn_username, "slots", slots, "is_2fa", is_2fa, "monthly_plan_duration", mp_duration};
 	}
 	
 	LACTION0(UCGetHelperStatusAction, "get_helper_status") {
@@ -1038,15 +1036,30 @@ namespace FBUC {
 		if(intent->banned_from_payment) {
 			throw InvalidRequestDemand{"Payment request while being banned from payment"};
 		}
+		std::string return_url="https://api.fastbuilder.pro/api/stripe_recover?ssid=";
+		if(getenv("DEBUG")) {
+			return_url="http://127.0.0.1:8687/api/stripe_recover?ssid=";
+		}
+		return_url+=session->session_id;
 		httplib::Params params{
-			{"amount", std::to_string(intent->stripe_price*100)},
-			{"currency", "cny"},
+			{"line_items[0][quantity]", "1"},
+			{"line_items[0][price_data][tax_behavior]", "exclusive"},
+			{"line_items[0][price_data][currency]", "cny"},
+			{"line_items[0][price_data][product_data][name]", "User Center Products"},
+			{"line_items[0][price_data][unit_amount]", std::to_string(intent->stripe_price*100)},
+			{"mode", "payment"},
+			{"allow_promotion_codes", "true"},
 			{"payment_method_types[0]", "card"},
-			{"payment_method_types[1]", "alipay"}
+			{"payment_method_types[1]", "alipay"},
+			{"success_url", return_url},
+			{"cancel_url", return_url},
+			{"automatic_tax[enabled]", "true"},
+			{"consent_collection[terms_of_service]", "required"}
 		};
-		auto stripe_res=stripeClient.Post("/v1/payment_intents", params);
+		stripe_retry_01: {}
+		auto stripe_res=stripeClient.Post("/v1/checkout/sessions", params);
 		if(!stripe_res) {
-			throw ServerErrorDemand{"Unknown error"};
+			goto stripe_retry_01;
 		}
 		Json::Value stripe_parsed;
 		if(!Utils::parseJSON(stripe_res->body, &stripe_parsed, nullptr)) {
@@ -1056,12 +1069,7 @@ namespace FBUC {
 		payment_intents[stripe_parsed["id"].asString()]=payment_intents[session->user->username];
 		payments_mutex.unlock();
 		intent->stripe_pid=stripe_parsed["id"].asString();
-		std::string return_url="https://api.fastbuilder.pro/api/stripe_recover?ssid=";
-		if(getenv("DEBUG")) {
-			return_url="http://127.0.0.1:8687/api/stripe_recover?ssid=";
-		}
-		return_url+=session->session_id;
-		return {true, "", "clientSecret", stripe_parsed["client_secret"].asString(), "return_url", return_url};
+		return {true, "", "url", stripe_parsed["url"]};
 	}
 	
 	LACTION0(GetPaymentLogAction, "get_payment_log") {
@@ -1264,19 +1272,6 @@ namespace FBUC {
 		}
 		fbdb["contacts"].delete_one(document{}<<"username"<<*session->user->username<<"identifier"<<*identifier<<finalize);
 		return {true};
-	}
-	
-	LACTION0(GetIsRateLimitedAction, "get_is_rate_limited") {
-		return {true, "", "value", *session->user->rate_limit_counter>=RATE_LIMIT_VALUE};
-	}
-	
-	LACTION1(WaiveRateLimitAction, "waive_rate_limit",
-			std::string, captcha, "captcha") {
-		if(!session->verifyCaptcha(captcha)) {
-			return {false, "验证码不正确"};
-		}
-		*session->user->rate_limit_counter=0;
-		return {true, "ok"};
 	}
 	
 	LACTION7(GetWhitelistAction, "get_whitelist",
@@ -1627,19 +1622,6 @@ namespace FBUC {
 				SPDLOG_INFO("Phoenix login (rejected): {} -> {} [unauthorized server code] IP: {}", *user->username, *server_code, session->ip_address);
 				return {false, "指定的租赁服号未授权，请前往用户中心设置", "translation", 13};
 			}
-			if(false) {
-				time_t current_time=time(nullptr);
-				struct tm local_time;
-				localtime_r(&current_time, &local_time);
-				// Rate limit from 7 a.m. to 3 p.m. PT
-				if(local_time.tm_hour>=8&&local_time.tm_hour<=14) {
-					(*user->rate_limit_counter)++;
-					if(*user->rate_limit_counter>=RATE_LIMIT_VALUE) {
-						SPDLOG_INFO("Phoenix login (rejected): {} -> {} [RATE LIMIT] IP: {}", *user->username, *server_code, session->ip_address);
-						return {false, "[RATE LIMIT] 您的请求过于频繁，现已被限制使用，请稍等一段时间或前往用户中心输入验证码解除限制。"};
-					}
-				}
-			}
 		}
 		NEMCUser nemcUser;
 		if(user->nemc_temp_info.has_value()) {
@@ -1736,6 +1718,7 @@ namespace FBUC {
 		}
 		httplib::Params params{
 			{"line_items[0][quantity]", "1"},
+			{"line_items[0][price_data][tax_behavior]", "exclusive"},
 			{"line_items[0][price_data][currency]", "cny"},
 			{"line_items[0][price_data][product_data][name]", "FBUC Charge"},
 			{"line_items[0][price_data][unit_amount]", std::to_string(value*100)},
@@ -1744,11 +1727,13 @@ namespace FBUC {
 			{"payment_method_types[0]", "card"},
 			{"payment_method_types[1]", "alipay"},
 			{"success_url", return_url},
-			{"cancel_url", return_url}
+			{"cancel_url", return_url},
+			{"automatic_tax[enabled]", "true"}
 		};
+		stripe_retry_02: {}
 		auto stripe_res=stripeClient.Post("/v1/checkout/sessions", params);
 		if(!stripe_res) {
-			throw ServerErrorDemand{"Unknown error"};
+			goto stripe_retry_02;
 		}
 		Json::Value stripe_parsed;
 		if(!Utils::parseJSON(stripe_res->body, &stripe_parsed, nullptr)) {
@@ -1817,8 +1802,6 @@ namespace FBUC {
 		Action::enmap(new CreateUserContactAction),
 		Action::enmap(new UpdateUserContactAction),
 		Action::enmap(new DeleteUserContactAction),
-		//Action::enmap(new GetIsRateLimitedAction),
-		Action::enmap(new WaiveRateLimitAction),
 		Action::enmap(new Kickstart2FAAction),
 		Action::enmap(new FinishRegistering2FAAction),
 		Action::enmap(new FinishLogin2FAAction),
@@ -1939,7 +1922,7 @@ extern "C" void init_user_center() {
 					continue;
 				}
 				time_t time_passed=now-session->last_alive;
-				if(time_passed>3600) {
+				if(time_passed>2400) {
 					if(it->second->user) {
 						*it->second->user->keep_reference=false;
 					}
@@ -2112,14 +2095,11 @@ extern "C" void init_user_center() {
 			Json::Value event;
 			Utils::parseJSON(req.body, &event, nullptr);
 			std::string event_type=event["type"].asString();
-			if(event_type!="checkout.session.completed"&&event_type!="charge.succeeded"&&event_type!="payment_intent.succeeded") {
+			if(event_type!="checkout.session.completed"/*&&event_type!="charge.succeeded"&&event_type!="payment_intent.succeeded"*/) {
 				res.set_content("200 but not expected", "text/plain");
 				return;
 			}
 			Json::Value &session=event["data"]["object"];
-			if(event_type=="charge.succeeded") {
-				return;
-			}
 			payments_mutex.lock_shared();
 			if(!payment_intents.contains(session["id"].asString())) {
 				payments_mutex.unlock_shared();
@@ -2139,10 +2119,10 @@ extern "C" void init_user_center() {
 			}
 			FBUC::finalizePaymentIntent(intent, user->user.get(), fmt::format("@Stripe+{}", session["id"].asString()));
 		});
-		server.Options(R"(/api/(administrative/)?([a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
+		server.Options(R"(/api/(administrative/)?((phoenix/)?[0-9a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
 			res.status=204;
 		});
-		server.Get(R"(/api/(administrative/)?([a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
+		server.Get(R"(/api/(administrative/)?((phoenix/)?[0-9a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
 			if(!req.matches[2].length()) {
 				res.status=404;
 				return;
@@ -2162,7 +2142,7 @@ extern "C" void init_user_center() {
 			}
 			enter_action_clust(action, parsed_args, req, res, isAdministrative);
 		});
-		server.Post(R"(/api/(administrative/)?([a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
+		server.Post(R"(/api/(administrative/)?((phoenix/)?[0-9a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
 			if(!req.matches[2].length()) {
 				res.status=404;
 				return;
