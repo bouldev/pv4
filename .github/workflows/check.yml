@@ -27,9 +27,11 @@ jobs:
         cmake -DCMAKE_BUILD_TYPE=Release ..
         make -j8
     - name: Pack artifacts
-      run: tar -czf pv4-prod-dry.tar.gz pv4 modules.json prod_modules
+      run: |
+        cd build
+        tar -czf pv4-prod-dry.tar.gz pv4 modules.json prod_modules
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
         name: pv4-prod-dry
-        path: pv4-prod-dry.tar.gz
+        path: build/pv4-prod-dry.tar.gz
