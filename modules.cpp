@@ -94,6 +94,7 @@ void Modules::unloadModules() {
 	if(should_shutdown) {
 		SPDLOG_INFO("Module unloading succeeded, shutdown flag ON");
 		SPDLOG_INFO("Quit correctly");
+		spdlog::shutdown();
 		exit(0);
 	}
 }

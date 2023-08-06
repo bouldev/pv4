@@ -4,6 +4,7 @@
 struct Product {
 	virtual unsigned int product_id()=0;
 	virtual std::string product_name()=0;
+	virtual std::string product_name_en()=0;
 	virtual bool forbid_cart() { return false; }
 	virtual unsigned int price()=0;
 	virtual std::string product_detail()=0;

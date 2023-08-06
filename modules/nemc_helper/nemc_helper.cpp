@@ -1,5 +1,4 @@
 #include "nemc_helper.h"
-#define CPPHTTPLIB_OPENSSL_SUPPORT
 
 static bool mdl_nemc_helper_under_destruction=false;
 

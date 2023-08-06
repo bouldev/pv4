@@ -19,37 +19,15 @@ jobs:
         sudo apt update
         sudo apt install libzstd-dev libopencv-dev
         echo 1.23.2>mongodb/mongo-c-driver/VERSION_CURRENT
-    
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: depends
-        key: pv4-dep
 
     - name: Build
       run: |
-        make
-        pushd modules/nemc_helper
-        make
-        popd
-        pushd modules/products
-        make
-        popd
-        pushd modules/shutdown
-        make
-        popd
-        pushd modules/whitelist
-        make
-        popd
-        pushd modules/user_center
-        make
-        popd
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+        make -j8
     - name: Pack artifacts
-      run: |
-        sed -i -E "s/.\/modules\/(.*?)\/(lib(.*?)\.so)/.\/prod_modules\/\2/g" modules.json
-        mkdir -p prod_modules
-        mv modules/*/libpv4-*.so prod_modules/
-        tar -czf pv4-prod-dry.tar.gz pv4 modules.json prod_modules
+      run: tar -czf pv4-prod-dry.tar.gz pv4 modules.json prod_modules
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:

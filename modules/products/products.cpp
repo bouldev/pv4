@@ -9,6 +9,10 @@ struct FixedSlotProduct:Product {
 		return "固定 SLOT";
 	}
 	
+	virtual std::string product_name_en() {
+		return "Fixed slot";
+	}
+	
 	virtual unsigned int price() {
 		return 32;
 	}
@@ -41,8 +45,12 @@ struct SlotProduct : Product {
 		return "可变 SLOT";
 	}
 	
+	virtual std::string product_name_en() {
+		return "Modifiable slot";
+	}
+	
 	virtual unsigned int price() {
-		return 100;
+		return 80;
 	}
 	
 	virtual std::string product_detail() {
@@ -71,6 +79,10 @@ struct MonthlyPlanNewUserProduct : Product {
 	
 	virtual std::string product_name() {
 		return "1 个月服务使用权 (+1 可变SLOT)";
+	}
+	
+	virtual std::string product_name_en() {
+		return "1 month subscription (+1 modifiable slot)";
 	}
 	
 	virtual unsigned int price() {
@@ -110,6 +122,10 @@ struct MonthlyPlan1MonthProduct : Product {
 		return "1 个月服务使用权";
 	}
 	
+	virtual std::string product_name_en() {
+		return "1 month subscription";
+	}
+	
 	virtual unsigned int price() {
 		return 32;
 	}
@@ -142,6 +158,10 @@ struct MonthlyPlan3MonthsProduct : Product {
 	
 	virtual std::string product_name() {
 		return "3 个月服务使用权";
+	}
+	
+	virtual std::string product_name_en() {
+		return "3 months subscription";
 	}
 	
 	virtual unsigned int price() {
@@ -178,6 +198,10 @@ struct MonthlyPlan2YearsProduct : Product {
 		return "2 年服务使用权";
 	}
 	
+	virtual std::string product_name_en() {
+		return "2 years subscription";
+	}
+	
 	virtual unsigned int price() {
 		return 750;
 	}
@@ -210,6 +234,10 @@ struct DropHelperFreeProduct : Product {
 	
 	virtual std::string product_name() {
 		return "丢弃辅助用户 (免费)";
+	}
+	
+	virtual std::string product_name_en() {
+		return "";
 	}
 	
 	virtual unsigned int price() {
@@ -249,12 +277,20 @@ struct DropHelperProduct : Product {
 		return "丢弃辅助用户";
 	}
 	
+	virtual std::string product_name_en() {
+		return "";
+	}
+	
 	virtual unsigned int price() {
 		return 32;
 	}
 	
 	virtual std::string product_detail() {
 		return "丢弃您的辅助用户。";
+	}
+	
+	virtual bool forbid_cart() {
+		return true;
 	}
 	
 	/*virtual bool check_on(FBWhitelist::User &user) {
@@ -289,7 +325,7 @@ extern "C" std::vector<Product *> const& all_products() {
 	return _pv4_products_all_products;
 }
 
-__attribute__((destructor)) static void _products_destruct() {
+extern "C" void _products_destruct() {
 	for(Product *i:_pv4_products_all_products) {
 		delete i;
 	}

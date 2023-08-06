@@ -1,10 +1,10 @@
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "cpp-httplib/httplib.h"
-#include "../action_core/action.h"
+#include "action.h"
 #include "whitelist.h"
-#include "../../utils.h"
-#include "../secrets/secrets.h"
-#include "../products/products.h"
+#include "utils.h"
+#include "secrets.h"
+#include "products.h"
 #include <memory>
 #include <thread>
 #include <shared_mutex>
@@ -14,10 +14,11 @@
 #include <cxxabi.h>
 #include <dlfcn.h>
 #include "Captcha.h"
-// No extern "C" for those 2 below, as they're going to be built by g++ instead of gcc
+extern "C" {
 #include "cotp/cotp.h"
 #include "cotp/otpuri.h"
 #include "qrcode/qrcode.h"
+}
 #include <openssl/hmac.h>
 
 #include <mongocxx/instance.hpp>
@@ -694,7 +695,7 @@ namespace FBUC {
 		std::vector<Product *> const& products=all_products();
 		Json::Value product_list(Json::arrayValue);
 		for(Product *i:products) {
-			if(!i->check_on(user))
+			if(i->forbid_cart()||!i->check_on(user))
 				continue;
 			product_list.append(i->toJSON());
 		}
@@ -727,6 +728,9 @@ namespace FBUC {
 					return {false, "商品已在购物车"};
 				}
 			}
+		}
+		if(session->cart.size()>8) {
+			return {false, "购物车内商品过多"};
 		}
 		session->cart.push_back(target);
 		return {true, ""};
@@ -1042,11 +1046,11 @@ namespace FBUC {
 		}
 		return_url+=session->session_id;
 		httplib::Params params{
-			{"line_items[0][quantity]", "1"},
-			{"line_items[0][price_data][tax_behavior]", "exclusive"},
-			{"line_items[0][price_data][currency]", "cny"},
-			{"line_items[0][price_data][product_data][name]", "User Center Products"},
-			{"line_items[0][price_data][unit_amount]", std::to_string(intent->stripe_price*100)},
+			//{"line_items[0][quantity]", "1"},
+			//{"line_items[0][price_data][tax_behavior]", "exclusive"},
+			//{"line_items[0][price_data][currency]", "cny"},
+			//{"line_items[0][price_data][product_data][name]", "User Center Products"},
+			//{"line_items[0][price_data][unit_amount]", std::to_string(intent->stripe_price*100)},
 			{"mode", "payment"},
 			{"allow_promotion_codes", "true"},
 			{"payment_method_types[0]", "card"},
@@ -1056,6 +1060,14 @@ namespace FBUC {
 			{"automatic_tax[enabled]", "true"},
 			{"consent_collection[terms_of_service]", "required"}
 		};
+		for(unsigned int i=0;i<intent->content.size();i++) {
+			Product *item=intent->content[i];
+			params.emplace(fmt::format("line_items[{}][quantity]", i), "1");
+			params.emplace(fmt::format("line_items[{}][price_data][tax_behavior]", i), "exclusive");
+			params.emplace(fmt::format("line_items[{}][price_data][currency]", i), "cny");
+			params.emplace(fmt::format("line_items[{}][price_data][product_data][name]", i), item->product_name_en());
+			params.emplace(fmt::format("line_items[{}][price_data][unit_amount]", i), std::to_string(item->price()*100));
+		}
 		stripe_retry_01: {}
 		auto stripe_res=stripeClient.Post("/v1/checkout/sessions", params);
 		if(!stripe_res) {
