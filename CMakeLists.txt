@@ -34,7 +34,7 @@ add_subdirectory(modules/user_center)
 
 find_package(OpenSSL REQUIRED)
 
-add_executable(pv4 main.cpp action.cpp modules.cpp utils.cpp)
+add_executable(pv4 src/main.cpp src/action.cpp src/modules.cpp src/utils.cpp)
 set_property(TARGET pv4 PROPERTY ENABLE_EXPORTS ON)
 add_custom_command(TARGET pv4 POST_BUILD COMMAND cp ${PROJECT_SOURCE_DIR}/modules.json ${PROJECT_BINARY_DIR}/)
 if(${CMAKE_BUILD_TYPE} MATCHES "^Release$")

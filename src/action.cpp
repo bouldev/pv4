@@ -1,3 +1,7 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <json/json.h>
 #include <string>
 #include <fmt/format.h>

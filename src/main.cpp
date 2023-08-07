@@ -1,3 +1,14 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#else
+// Assume defines when unconfigured
+#define HAVE_DLADDR1
+#define HAVE_UNISTD_H
+#endif
+
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -16,6 +27,10 @@
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/daily_file_sink.h"
 #include "modules.h"
+
+#ifdef __APPLE__
+typedef sig_t sighandler_t;
+#endif
 
 mongocxx::instance mongodb_instance;
 mongocxx::pool mongodb_pool{mongocxx::uri{"mongodb://127.0.0.1:27017"}};
@@ -46,10 +61,16 @@ void stackTrace(int signal) {
 	Dl_info c_dl_info;
 	for(int i=0;i<addrlen;i++) {
 		void *dl_handle;
-		if(dladdr1(addrlist[i], &c_dl_info, &dl_handle, RTLD_DL_LINKMAP)==0) {
+#ifdef HAVE_DLADDR1
+		if(dladdr1(addrlist[i], &c_dl_info, &dl_handle, RTLD_DL_LINKMAP)==0)
+#else
+		if(dladdr(addrlist[i], &c_dl_info)==0)
+#endif
+		{
 			SPDLOG_CRITICAL("#{}: [{:#x}:dladdr() failed]\n", i, (uint64_t)addrlist[i]);
 			continue;
 		}
+
 		if(!c_dl_info.dli_sname) {
 			c_dl_info.dli_sname="0";
 		}
@@ -61,7 +82,12 @@ void stackTrace(int signal) {
 		if(demangling_status!=0) {
 			symbol_name=(char *)c_dl_info.dli_sname;
 		}
+#ifdef HAVE_DLADDR1
 		std::string module_name=Modules::getModuleFromHandle(dl_handle);
+#else
+#warning Need impl for your OS!
+		std::string module_name="";
+#endif
 		if(module_name.length()!=0) {
 			SPDLOG_CRITICAL("#{}: {}+{:#x} ([{}]:{}+{:#x})\n", i, symbol_name, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_saddr, module_name, c_dl_info.dli_fname, (uint64_t)addrlist[i]-(uint64_t)c_dl_info.dli_fbase);
 		}else{

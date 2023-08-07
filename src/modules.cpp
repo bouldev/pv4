@@ -1,4 +1,13 @@
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#else
+// Assume defines when unconfigured
+#define HAVE_LINK_H
+#endif
+
+#ifdef HAVE_LINK_H
 #include <link.h>
+#endif
 #include <dlfcn.h>
 #include <mutex>
 #include <vector>
