@@ -21,6 +21,7 @@ add_library(pv4-framework INTERFACE)
 
 target_include_directories(pv4-framework INTERFACE
 	${pv4_SOURCE_DIR}
+        ${pv4_SOURCE_DIR}/src
 	${FMT_SOURCE_DIR}/include
 	${jsoncpp_SOURCE_DIR}/include
 	${MONGOCXX_SOURCE_DIR}/..
