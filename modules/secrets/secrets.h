@@ -41,6 +41,10 @@ public:
 	static std::string get_telegram_webhook_secret() {
 		return "123";
 	}
+	
+	static std::string add_external_bot_salt(std::string const& original) {
+		return original;
+	}
 };
 
 const unsigned char *_fbtoken_iv=(unsigned char*)"1234567890abcdef";

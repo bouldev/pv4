@@ -516,7 +516,7 @@ namespace FBUC {
 		FBWhitelist::User user=*session->user;
 		std::string blc="机器人绑定码在 Token 登录状态下不能被显示。";
 		if(!session->token_login) {
-			blc=fmt::format("v|{}!{}", *(user.username), Utils::sha256(fmt::format("v|{}b4$9v",*(user.username))));
+			blc=fmt::format("v|{}!{}", *(user.username), Utils::sha256(Secrets::add_external_bot_salt(user.username)));
 		}
 		std::string cn_username=user.cn_username.has_value()?*(user.cn_username):"";
 		Json::Value slots=user.rentalservers.toDescriptiveJSON();
@@ -1781,6 +1781,26 @@ namespace FBUC {
 		throw ServerErrorDemand{"Not implemented yet"};
 	}
 	
+	ACTION2(ExternalBotGetUserInfo, "bot_ext_get_userinfo",
+			std::string, username, "username",
+			std::string, token, "token") {
+		if(token!=Secrets::add_external_bot_salt("ACCESS"))
+			throw AccessDeniedDemand{"Access denied"};
+		auto userinfo=FBWhitelist::Whitelist::findUser(username);
+		if(!userinfo.has_value()) {
+			return {true, "honored", "nouser", true};
+		}
+		float mp_duration;
+		if(!userinfo->free) {
+			mp_duration=-1;
+		}else if(!userinfo->expiration_date.stillAlive()) {
+			mp_duration=0;
+		}else{
+			mp_duration=round(((userinfo->expiration_date-time(nullptr))/86400.00)*100.0)/100.0;
+		}
+		return {true, "honored", "nouser", false, "slots", userinfo->rentalservers.toDescriptiveJSON(), "mp", mp_duration};
+	}
+	
 	static FBUCActionCluster ucGeneralActions(0, {
 		Action::enmap(new APIListAction),
 		Action::enmap(new LoginAction),
@@ -1823,7 +1843,8 @@ namespace FBUC {
 		Action::enmap(new PhoenixTransferStartTypeAction),
 		Action::enmap(new PhoenixTransferChecknumAction),
 		Action::enmap(new HelperChargeAction),
-		Action::enmap(new GetPhoenixTokenAction)
+		Action::enmap(new GetPhoenixTokenAction),
+		Action::enmap(new ExternalBotGetUserInfo)
 	});
 	
 	static FBUCActionCluster ucAdministrativeActions(1, {
@@ -1971,6 +1992,9 @@ extern "C" void init_user_center() {
 	}).detach();
 	std::thread([](){
 		httplib::Server server;
+		server.Options("/", [](const httplib::Request& req, httplib::Response& res) {
+			res.status=204;
+		});
 		server.Get("/", [](const httplib::Request& req, httplib::Response& res) {
 			res.set_content("Hello, world!", "text/plain");
 		});

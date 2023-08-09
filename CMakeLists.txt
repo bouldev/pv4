@@ -37,18 +37,6 @@ find_package(OpenSSL REQUIRED)
 add_executable(pv4 src/main.cpp src/action.cpp src/modules.cpp src/utils.cpp)
 set_property(TARGET pv4 PROPERTY ENABLE_EXPORTS ON)
 add_custom_command(TARGET pv4 POST_BUILD COMMAND cp ${PROJECT_SOURCE_DIR}/modules.json ${PROJECT_BINARY_DIR}/)
-if(${CMAKE_BUILD_TYPE} MATCHES "^Release$")
-	if(EXISTS ${PROJECT_BINARY_DIR}/prod_modules)
-		add_custom_command(TARGET pv4 POST_BUILD COMMAND rm -rf ${PROJECT_BINARY_DIR}/prod_modules)
-	endif()
-	add_custom_command(TARGET pv4 POST_BUILD
-		COMMAND sed -i -E [["s/.\/modules\/(.*?)\/(lib(.*?)\.so)/.\/prod_modules\/\2/g"]] ${PROJECT_BINARY_DIR}/modules.json
-		COMMAND mkdir -p ${PROJECT_BINARY_DIR}/prod_modules
-		COMMAND ln ${PROJECT_BINARY_DIR}/modules/*/libpv4-*.so ${PROJECT_BINARY_DIR}/prod_modules/)
-	if(${PV4_USE_PRIVATE_NEMC_HELPER})
-		add_custom_command(TARGET pv4 POST_BUILD COMMAND ln ${PROJECT_BINARY_DIR}/modules/private/nemc_helper/libpv4-*.so ${PROJECT_BINARY_DIR}/prod_modules/)
-	endif()
-endif()
 target_link_libraries(pv4 
 	bson_static
 	mongoc_static
