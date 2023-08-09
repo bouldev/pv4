@@ -30,10 +30,11 @@ namespace FBWhitelist {
 		std::shared_ptr<void> private_1;
 		std::shared_ptr<void> private_2;
 		std::shared_ptr<void> private_3;
-		void *private_4;
 		
 		DBValue() {}
 	public:
+		const char *item_name;
+		
 		virtual void set(T const& target);
 		virtual void unset();
 		virtual DBValue& operator=(T const& target);
@@ -47,6 +48,8 @@ namespace FBWhitelist {
 		virtual T const* operator->() const;
 		virtual bool has_value() const;
 		virtual bool stillAlive() const;
+		virtual Json::Value toJSON() const;
+		virtual void fromJSON(Json::Value const& value);
 		
 		friend class User;
 		friend class Whitelist;
@@ -153,6 +156,9 @@ namespace FBWhitelist {
 		DBValue<std::string> two_factor_authentication_secret;
 		std::shared_ptr<uint32_t> rate_limit_counter;
 		std::shared_ptr<bool> keep_reference;
+		
+		DBValue<bool> *begin() { return (DBValue<bool> *)&username; };
+		DBValue<bool> *end() { return (DBValue<bool> *)&rate_limit_counter; };
 	};
 	
 

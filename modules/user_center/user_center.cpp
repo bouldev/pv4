@@ -72,6 +72,7 @@ namespace FBUC {
 		unsigned int price=0;
 		unsigned int helper_price=0;
 		unsigned int stripe_price=0;
+		int points_delta=0; // Positive: subject of increment, Negative: subject of reduction
 		std::vector<Product *> content;
 		bool needs_verify=false;
 		bool banned_from_payment=false;
@@ -364,7 +365,10 @@ namespace FBUC {
 		if(pSession) {
 			pSession->cart.clear();
 		}
-		std::string desc;
+		if(intent->points_delta) {
+			user->points+=intent->points_delta;
+		}
+		std::string desc=fmt::format("Δpts = {}\n",intent->points_delta);
 		Json::Value descContent(Json::arrayValue);
 		for(Product *i:intent->content) {
 			i->execute_on(*user);
@@ -783,6 +787,7 @@ namespace FBUC {
 				currentPaymentIntent->helper_price+=i->price()*0.8;
 			}
 		}
+		currentPaymentIntent->points_delta=currentPaymentIntent->price*7;
 		if(currentPaymentIntent->price<6) {
 			currentPaymentIntent->stripe_price=6;
 		}else{
@@ -816,18 +821,27 @@ namespace FBUC {
 		if(intent->card_only) {
 			show+="注意：含有仅官方支付商品。\n";
 		}
+		show+=fmt::format("现有 Points: <b style=\"color:orange;\">{}</b>\n", *session->user->points);
+		if(intent->points_delta>=0) {
+			show+=fmt::format("获得 Points: <b style=\"color:blue;\">{}</b>\n", intent->points_delta);
+		}else{
+			show+=fmt::format("消耗 Points: <b style=\"color:red;\">{}</b>\n", -intent->points_delta);
+		}
 		if(intent->banned_from_payment) {
 			show+="<hr/><b style=\"color:red;\">由于您的支付信息与他人出现重合，此账户已被永久禁止支付，其他功能不受影响。</b>";
 		}
 		if(intent->needs_verify) {
 			show+="<hr/><b style=\"color:blue;\">由于我们需要验证您的账户唯一性，本次支付只能使用本页面上的支付方式完成。</b>\n";
 		}
+		bool can_use_point=true;
+		if(intent->points_delta<0||intent->banned_from_payment) {
+			can_use_point=false;
+		}
 		if(getenv("DEBUG")) {
 			show+="\n\n<b style=\"color:red;\">调试模式</b>";
-			return {true,"", "show", show, "codepwn_pay_available", false, "isfree", intent->helper_price==0&&intent->price==0, "can_use_point", false, "needs_verify", intent->needs_verify,
-				"test_key", "pk_test_51MKodeE2lNjB2a2N3DSkPh20JkjjOAAVlHKK5bIRtPYeDmKCeseyP0phJbEPx9vKA4W6ovF4ziXPAJ0MOFx5fxW200LwFqAsGk"};
+			return {true,"", "show", show, "codepwn_pay_available", false, "isfree", intent->helper_price==0&&intent->price==0, "can_use_point", can_use_point, "needs_verify", intent->needs_verify};
 		}
-		return {true, "", "show", show, "codepwn_pay_available", false, "isfree", intent->helper_price==0&&intent->price==0, "can_use_point", false, "needs_verify", intent->needs_verify};
+		return {true, "", "show", show, "codepwn_pay_available", false, "isfree", intent->helper_price==0&&intent->price==0, "can_use_point", can_use_point, "needs_verify", intent->needs_verify};
 	}
 	
 	LACTION0(CheckPaymentAction, "check_payment") {
@@ -1060,13 +1074,21 @@ namespace FBUC {
 			{"automatic_tax[enabled]", "true"},
 			{"consent_collection[terms_of_service]", "required"}
 		};
-		for(unsigned int i=0;i<intent->content.size();i++) {
-			Product *item=intent->content[i];
-			params.emplace(fmt::format("line_items[{}][quantity]", i), "1");
-			params.emplace(fmt::format("line_items[{}][price_data][tax_behavior]", i), "exclusive");
-			params.emplace(fmt::format("line_items[{}][price_data][currency]", i), "cny");
-			params.emplace(fmt::format("line_items[{}][price_data][product_data][name]", i), item->product_name_en());
-			params.emplace(fmt::format("line_items[{}][price_data][unit_amount]", i), std::to_string(item->price()*100));
+		if(intent->points_delta<0) {
+			params.emplace("line_items[0][quantity]", "1");
+			params.emplace("line_items[0][price_data][tax_behavior]", "exclusive");
+			params.emplace("line_items[0][price_data][currency]", "cny");
+			params.emplace("line_items[0][price_data][product_data][name]", "Discounted Products Set");
+			params.emplace("line_items[0][price_data][unit_amount]", std::to_string(intent->stripe_price*100));
+		}else{
+			for(unsigned int i=0;i<intent->content.size();i++) {
+				Product *item=intent->content[i];
+				params.emplace(fmt::format("line_items[{}][quantity]", i), "1");
+				params.emplace(fmt::format("line_items[{}][price_data][tax_behavior]", i), "exclusive");
+				params.emplace(fmt::format("line_items[{}][price_data][currency]", i), "cny");
+				params.emplace(fmt::format("line_items[{}][price_data][product_data][name]", i), item->product_name_en());
+				params.emplace(fmt::format("line_items[{}][price_data][unit_amount]", i), std::to_string(item->price()*100));
+			}
 		}
 		stripe_retry_01: {}
 		auto stripe_res=stripeClient.Post("/v1/checkout/sessions", params);
@@ -1430,6 +1452,7 @@ namespace FBUC {
 			auto slot=user->rentalservers[**slotid];
 			if(slot) {
 				slot.locked.unset();
+				slot.lastdate.unset();
 			}
 		}else if(operation=="remove") {
 			if(!slotid->has_value()) {
@@ -1801,6 +1824,94 @@ namespace FBUC {
 		return {true, "honored", "nouser", false, "slots", userinfo->rentalservers.toDescriptiveJSON(), "mp", mp_duration};
 	}
 	
+	LACTION1(CheckoutUsePointsAction, "use_points_on_checkout",
+			uint32_t, value, "value") {
+		std::shared_ptr<FBUC::PaymentIntent> intent=session->payment_intent;
+		if(!intent||intent->paired||intent->approved) {
+			return {false, "没有有效的支付请求"};
+		}
+		if(!*value||!intent->content.size()) {
+			throw InvalidRequestDemand{"Invalid request"};
+		}
+		if(intent->banned_from_payment) {
+			throw InvalidRequestDemand{"Payment request while being banned from payment"};
+		}
+		if(intent->points_delta<0) {
+			return {false, "已经使用过 Points"};
+		}
+		if(*value%100)
+			return {false, "Points 使用不符合规则"};
+		intent->points_delta=-value;
+		uint32_t price_delta=*value/100;
+		if(price_delta>=intent->price) {
+			intent->points_delta=-(intent->price*100);
+			intent->price=0;
+			intent->helper_price=0;
+			intent->stripe_price=0;
+		}else{
+			intent->price-=price_delta;
+			intent->helper_price-=round((price_delta)*0.4);
+			intent->stripe_price-=price_delta;
+			if(intent->stripe_price<6)
+				intent->stripe_price=6;
+		}
+		return {true, "Perfect"};
+	}
+	
+	LACTION1(GetUserWhitelistValueAction, "get_user_whitelist_value",
+			FBWhitelist::User, user, "username") {
+		Json::Value output(Json::ValueType::arrayValue);
+		for(FBWhitelist::DBValue<bool> &val:*user) {
+			output.append(val.toJSON());
+		}
+		return {true, "", "value", output};
+	}
+	
+	LACTION6(SetUserWhitelistValueAction, "set_user_whitelist_value",
+			FBWhitelist::User, user, "username",
+			std::string, item_name, "item_name",
+			std::optional<int64_t>, int_value, "value",
+			std::optional<std::string>, string_value, "value",
+			std::optional<bool>, bool_value, "value",
+			std::optional<bool>, is_unset, "is_unset") {
+		Json::Value val;
+		FBWhitelist::DBValue<bool> *target=nullptr;
+		const char *itm=item_name->c_str();
+		for(FBWhitelist::DBValue<bool> &val:*user) {
+			if(!strcmp(val.item_name, itm)) {
+				if(is_unset->has_value()&&**is_unset) {
+					val.unset();
+					goto set_user_whitelist_value__early_return;
+				}
+				target=&val;
+				break;
+			}
+		}
+		if(!target) {
+			throw InvalidRequestDemand{"Target database item not found"};
+		}
+		if(int_value->has_value()) {
+			val=**int_value;
+		}else if(string_value->has_value()) {
+			val=**string_value;
+		}else if(bool_value->has_value()) {
+			val=**bool_value;
+		}else{
+			throw InvalidRequestDemand{"Invalid type"};
+		}
+		try {
+			target->fromJSON(val);
+		}catch(std::runtime_error const& err) {
+			throw InvalidRequestDemand{fmt::format("Operation failed: {}", err.what())};
+		}
+		set_user_whitelist_value__early_return: {}
+		Json::Value output(Json::ValueType::arrayValue);
+		for(FBWhitelist::DBValue<bool> &val:*user) {
+			output.append(val.toJSON());
+		}
+		return {true, "", "value", output};
+	}
+	
 	static FBUCActionCluster ucGeneralActions(0, {
 		Action::enmap(new APIListAction),
 		Action::enmap(new LoginAction),
@@ -1844,7 +1955,8 @@ namespace FBUC {
 		Action::enmap(new PhoenixTransferChecknumAction),
 		Action::enmap(new HelperChargeAction),
 		Action::enmap(new GetPhoenixTokenAction),
-		Action::enmap(new ExternalBotGetUserInfo)
+		Action::enmap(new ExternalBotGetUserInfo),
+		Action::enmap(new CheckoutUsePointsAction)
 	});
 	
 	static FBUCActionCluster ucAdministrativeActions(1, {
@@ -1857,7 +1969,9 @@ namespace FBUC {
 		Action::enmap(new UpdateUserPasswordAction),
 		Action::enmap(new ListUserRentalServersAction),
 		Action::enmap(new RentalServerOperationAction),
-		Action::enmap(new AddUserAction)
+		Action::enmap(new AddUserAction),
+		Action::enmap(new GetUserWhitelistValueAction),
+		Action::enmap(new SetUserWhitelistValueAction)
 	});
 	
 	static void enter_action_clust(FBUC::Action *action, Json::Value& parsed_args, const httplib::Request& req, httplib::Response& res, bool administrative=false);

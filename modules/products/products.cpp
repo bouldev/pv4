@@ -310,6 +310,35 @@ struct DropHelperProduct : Product {
 	}
 };
 
+struct AirProduct : Product {
+	virtual unsigned int product_id() {
+		return 9;
+	}
+	
+	virtual std::string product_name() {
+		return "空气";
+	}
+	
+	virtual std::string product_name_en() {
+		return "Air";
+	}
+	
+	virtual unsigned int price() {
+		return 120;
+	}
+	
+	virtual std::string product_detail() {
+		return "";
+	}
+	
+	virtual bool check_on(FBWhitelist::User &user) {
+		return *user.isAdministrator;
+	}
+	
+	virtual void execute_on(FBWhitelist::User &user) {
+	}
+};
+
 static std::vector<Product *> _pv4_products_all_products={
 	new FixedSlotProduct,
 	new SlotProduct,
@@ -318,7 +347,8 @@ static std::vector<Product *> _pv4_products_all_products={
 	new MonthlyPlan3MonthsProduct,
 	new MonthlyPlan2YearsProduct,
 	new DropHelperFreeProduct,
-	new DropHelperProduct
+	new DropHelperProduct,
+	new AirProduct
 };
 
 extern "C" std::vector<Product *> const& all_products() {

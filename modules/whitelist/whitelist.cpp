@@ -171,8 +171,53 @@ bool FBWhitelist::DBValue<T, DT>::stillAlive() const {
 		uint64_t ed=(uint64_t)**this;
 		return time(nullptr)<ed;
 	}
-	printf("WARNING: stillAlive called for non-calculatable stuff\n");
+	SPDLOG_WARN("WARNING: stillAlive called for non-calculatable stuff");
 	return false;
+}
+
+template <typename T, typename DT>
+Json::Value FBWhitelist::DBValue<T, DT>::toJSON() const {
+	Json::Value ret;
+	ret["has_value"]=has_value();
+	ret["name"]=item_name;
+	if constexpr(!std::is_arithmetic_v<T>&&!std::is_same_v<T, std::string>&&!std::is_same_v<T, bool>) {
+		ret["editable"]=false;
+		ret["type"]="complex";
+		return ret;
+	}else{
+		if constexpr(std::is_same_v<T, bool>) {
+			ret["type"]="bool";
+		}else if constexpr(std::is_same_v<T, std::string>) {
+			ret["type"]="std::string";
+		}else{
+			ret["type"]="int";
+		}
+		ret["editable"]=true;
+		if(*object) {
+			ret["value"]=**this;
+		}
+		return ret;
+	}
+}
+
+template <typename T, typename DT>
+void FBWhitelist::DBValue<T, DT>::fromJSON(Json::Value const& value) {
+	if constexpr(std::is_same_v<T, bool>) {
+		if(!value.isBool())
+			throw std::runtime_error("fromJSON: wanted bool");
+		*this=value.asBool();
+	}else if constexpr(std::is_arithmetic_v<T>) {
+		if(!value.isInt64()) {
+			throw std::runtime_error("fromJSON: wanted int64_t");
+		}
+		*this=value.asInt64();
+	}else if constexpr(std::is_same_v<T, std::string>) {
+		if(!value.isString())
+			throw std::runtime_error("fromJSON: wanted std::string");
+		*this=value.asString();
+	}else{
+		throw std::runtime_error("fromJSON: not accepting value");
+	}
 }
 
 template <typename T, typename DT>

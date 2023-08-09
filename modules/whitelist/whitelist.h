@@ -55,6 +55,8 @@ namespace FBWhitelist {
 		virtual T const* operator->() const;
 		virtual inline bool has_value() const { return (bool)*object; }
 		virtual bool stillAlive() const;
+		virtual Json::Value toJSON() const;
+		virtual void fromJSON(Json::Value const& value);
 		
 		friend class User;
 		friend class Whitelist;
@@ -186,8 +188,8 @@ namespace FBWhitelist {
 		std::shared_ptr<uint32_t> rate_limit_counter=std::make_shared<uint32_t>(0);
 		std::shared_ptr<bool> keep_reference=std::make_shared<bool>(false);
 	
-		inline DBValue<bool> *begin() { return (DBValue<bool> *)&username; };
-		inline DBValue<bool> *end() { return (DBValue<bool> *)&rate_limit_counter; };
+		DBValue<bool> *begin() { return (DBValue<bool> *)&username; };
+		DBValue<bool> *end() { return (DBValue<bool> *)&rate_limit_counter; };
 	};
 
 	class Whitelist {
