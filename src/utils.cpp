@@ -10,7 +10,7 @@
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
 #include <ctype.h>
-#include "modules/secrets/secrets.h"
+#include "../modules/secrets/secrets.h"
 
 std::string FBToken::encrypt(Json::Value const& value) {
 	return encrypt(Utils::writeJSON(value));
