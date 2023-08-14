@@ -154,6 +154,7 @@ namespace FBWhitelist {
 		DBValue<std::string> payment_verify_fingerprint;
 		DBValue<int32_t> points;
 		DBValue<std::string> two_factor_authentication_secret;
+		DBValue<NEMCUserAuthInfo> nemc_binded_account;
 		std::shared_ptr<uint32_t> rate_limit_counter;
 		std::shared_ptr<bool> keep_reference;
 		
@@ -171,6 +172,7 @@ namespace FBWhitelist {
 		
 		static std::shared_ptr<FBWhitelist::User> _findUser(std::string const& username);
 	public:
+		static std::shared_ptr<FBWhitelist::User> acquireUser(std::string const& username);
 		static std::optional<FBWhitelist::User> findUser(std::string const& username);
 		static std::optional<FBWhitelist::User> createUser(std::string const& username, std::string const& password);
 		

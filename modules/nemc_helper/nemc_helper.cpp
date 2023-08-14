@@ -19,20 +19,24 @@ NEMCUserAuthInfo::operator bsoncxx::array::view() {
 	return stored_arr_value.view();
 }
 
-std::variant<std::string, NEMCError> NEMCUserAuthInfo::getJitsuMeiAddress() const {
-	return NEMCError{"Failed to get realname address as this function is stubbed.", -1};
+std::string NEMCUserAuthInfo::getJitsuMeiAddress() const {
+	throw NEMCError{"Failed to get realname address as this function is stubbed.", -1};
 }
 
-std::variant<NEMCUserAuthInfo, NEMCError> NEMCUserAuthInfo::createGuest(NEMCUserAuthInfo const& device) {
-	return NEMCError{"Stubbed", -1};
+NEMCUserAuthInfo NEMCUserAuthInfo::loginWithEmail(std::string const& e,std::string const& p) {
+	throw NEMCError{"Stubbed", -1};
 }
 
-std::variant<NEMCUserAuthInfo, NEMCError> NEMCUserAuthInfo::createGuest() {
-	return NEMCError{"Stubbed", -1};
+NEMCUserAuthInfo NEMCUserAuthInfo::createGuest(NEMCUserAuthInfo const& device) {
+	throw NEMCError{"Stubbed", -1};
 }
 
-std::variant<NEMCUser, NEMCError> NEMCUserAuthInfo::auth() const {
-	return NEMCError{"Stubbed", -1};
+NEMCUserAuthInfo NEMCUserAuthInfo::createGuest(std::string const& rid) {
+	throw NEMCError{"Stubbed", -1};
+}
+
+NEMCUser NEMCUserAuthInfo::auth() const {
+	throw NEMCError{"Stubbed", -1};
 }
 
 NEMCUser::NEMCUser(bsoncxx::document::element const& userInfo) {
@@ -49,16 +53,16 @@ bool NEMCUser::isLoggedIn() const {
 	return false;
 }
 
-std::variant<std::string, NEMCError> NEMCUser::getUsername() const {
-	return NEMCError{"Stubbed"};
+std::string NEMCUser::getUsername() const {
+	throw NEMCError{"Stubbed"};
 }
 
-std::optional<NEMCError> NEMCUser::setUsername(std::string const& username) const {
-	return std::optional<NEMCError>();
+void NEMCUser::setUsername(std::string const& username) const {
+	return;
 }
 
-std::variant<std::pair<std::string, std::string>, NEMCError> NEMCUser::doImpact(std::string const& serverCode, std::string const& serverPasscode, std::string const& clientKey, std::string const& username) const {
-	return NEMCError{"Error authenticating to server",-1};
+std::pair<std::string, std::string> NEMCUser::doImpact(std::string const& serverCode, std::string const& serverPasscode, std::string const& clientKey, std::string const& username) const {
+	throw NEMCError{"Failed authenticating to server",-1};
 }
 
 bool NEMCUser::operator==(NEMCUser const& value) const {

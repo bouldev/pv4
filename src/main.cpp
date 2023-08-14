@@ -85,7 +85,6 @@ void stackTrace(int signal) {
 #ifdef HAVE_DLADDR1
 		std::string module_name=Modules::getModuleFromHandle(dl_handle);
 #else
-#warning Need impl for your OS!
 		std::string module_name="";
 #endif
 		if(module_name.length()!=0) {

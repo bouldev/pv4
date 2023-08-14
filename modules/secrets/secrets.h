@@ -47,8 +47,8 @@ public:
 	}
 };
 
-const unsigned char *_fbtoken_iv=(unsigned char*)"1234567890abcdef";
-const unsigned char *_fbtoken_key=(unsigned char*)"0123456789abcdefghijklmnopqrstuv";
+static const unsigned char *_fbtoken_iv=(unsigned char*)"1234567890abcdef";
+static const unsigned char *_fbtoken_key=(unsigned char*)"0123456789abcdefghijklmnopqrstuv";
 
 #else
 
