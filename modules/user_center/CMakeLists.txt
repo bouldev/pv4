@@ -7,7 +7,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-enum-enum-conversion")
 add_library(pv4-user-center SHARED
 	user_center.cpp
 	basic.cpp
-	actions/basic_actions.cpp
+	actions/account.cpp
 	actions/marketplace.cpp
 	actions/nemc.cpp
 	actions/db_related.cpp

@@ -186,11 +186,16 @@ namespace FBWhitelist {
 		DBValue<int32_t> points="points";
 		DBValue<std::string> two_factor_authentication_secret="two_factor_authentication_secret";
 		DBValue<NEMCUserAuthInfo> nemc_binded_account="nemc_binded_account";
+		DBValue<std::string> phoenix_login_otp="phoenix_login_otp";
+		DBValue<bool> disable_all_security_measures="disable_all_security_measures";
 		std::shared_ptr<uint32_t> rate_limit_counter=std::make_shared<uint32_t>(0);
 		std::shared_ptr<bool> keep_reference=std::make_shared<bool>(false);
-	
+		
+		#pragma GCC push_options
+		#pragma GCC optimize("O0")
 		DBValue<bool> *begin() { return (DBValue<bool> *)&username; };
 		DBValue<bool> *end() { return (DBValue<bool> *)&rate_limit_counter; };
+		#pragma GCC pop_options
 	};
 
 	class Whitelist {

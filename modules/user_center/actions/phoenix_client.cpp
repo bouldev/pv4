@@ -24,7 +24,8 @@ namespace FBUC {
 				throw InvalidRequestDemand{"Insufficient arguments"};
 			}
 			username=**_username;
-			password=Utils::sha256(Secrets::addSalt(**_password));
+			//password=Utils::sha256(Secrets::addSalt(**_password));
+			password=**_password;
 		}else{
 			if(_username->has_value()) {
 				throw InvalidRequestDemand{"Conflicted arguments"};
@@ -38,8 +39,23 @@ namespace FBUC {
 			password=token_content["password"].asString();
 		}
 		std::shared_ptr<FBWhitelist::User> pUser=FBWhitelist::Whitelist::acquireUser(username);
-		if(!pUser||pUser->password!=password) {
-			return {false, "Invalid username or password"};
+		if(!pUser->disable_all_security_measures) {
+			if(login_token->has_value()) {
+				if(!pUser||pUser->password!=password) {
+					return {false, "Invalid username or password"};
+				}
+			}else{
+				if(!pUser||Utils::sha256(pUser->phoenix_login_otp)!=password) {
+					return {false, "无效用户名或一次性密码，注意: 为防止账号盗用，您不再能够使用用户中心的密码登录 PhoenixBuilder ，请使用 FBToken 或用户中心一次性密码登录。"};
+				}
+				pUser->phoenix_login_otp=Utils::generateUUID();
+			}
+		}else{
+			if(!login_token->has_value())
+				password=Utils::sha256(Secrets::addSalt(**_password));
+			if(!pUser||pUser->password!=password) {
+				return {false, "Invalid username or password"};
+			}
 		}
 		auto user=pUser;
 		if(user->free&&!user->expiration_date.stillAlive()) {
@@ -111,14 +127,14 @@ namespace FBUC {
 		}
 		std::string privateSigningKeyProve=fmt::format("{}|{}", pubKey, *user->username);
 		privateSigningKeyProve.append(fmt::format("::{}", Utils::cv4Sign(privateSigningKeyProve)));
-		session->user=std::make_shared<FBWhitelist::User>(*pUser);
+		session->user=pUser;
 		session->login_2fa=false;
 		session->phoenix_only=true;
 		std::string rettoken="";
 		if(!login_token->has_value()) {
 			Json::Value token;
 			token["username"]=username;
-			token["password"]=password;
+			token["password"]=pUser->password;
 			token["newToken"]=true;
 			rettoken=FBToken::encrypt(token);
 		}

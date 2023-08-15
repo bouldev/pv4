@@ -138,6 +138,45 @@ namespace FBUC {
 		return {true, "", "value", output};
 	}
 	
+	LACTION3(RentalServerOperationAction, "rental_server_operation",
+			FBWhitelist::User, user, "username",
+			std::optional<std::string>, slotid, "slotid",
+			std::string, operation, "operation") {
+		if(operation=="unlock") {
+			if(!slotid->has_value()) {
+				throw InvalidRequestDemand{"Missing required argument `slotid'."};
+			}
+			auto slot=user->rentalservers[**slotid];
+			if(slot) {
+				slot.locked.unset();
+				slot.lastdate.unset();
+			}
+		}else if(operation=="remove") {
+			if(!slotid->has_value()) {
+				throw InvalidRequestDemand{"Missing required argument `slotid'."};
+			}
+			user->rentalservers.erase_slot(**slotid);
+		}else if(operation=="add") {
+			user->rentalservers.append_slot();
+		}else if(operation=="lock") {
+			if(!slotid->has_value()) {
+				throw InvalidRequestDemand{"Missing required argument `slotid'."};
+			}
+			auto slot=user->rentalservers[**slotid];
+			if(slot) {
+				slot.locked=true;
+			}
+		}else{
+			throw InvalidRequestDemand{"Invalid operation"};
+		}
+		return {true, "ok"};
+	}
+	
+	LACTION1(ListUserRentalServersAction, "list_user_rental_servers",
+			FBWhitelist::User, user, "user") {
+		return {true, "", "rentalservers", user->rentalservers.toAdministrativeJSON()};
+	}
+	
 	static FBUCActionCluster administrativeGeneralActions(0, {
 		//Action::enmap(new UCCalculateMonthlyPlanDurationAction),
 		Action::enmap(new ExternalBotGetUserInfoAction)
@@ -150,6 +189,8 @@ namespace FBUC {
 		Action::enmap(new UpdateUserPasswordAction),
 		Action::enmap(new AddUserAction),
 		Action::enmap(new GetUserWhitelistValueAction),
-		Action::enmap(new SetUserWhitelistValueAction)
+		Action::enmap(new SetUserWhitelistValueAction),
+		Action::enmap(new RentalServerOperationAction),
+		Action::enmap(new ListUserRentalServersAction)
 	});
 };

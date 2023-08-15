@@ -53,15 +53,17 @@ namespace FBUC {
 		return result;
 	}
 	
-	ACTION3(LoginAction, "login",
+	ACTION4(LoginAction, "login",
 			std::optional<std::string>, _username, "username",
 			std::optional<std::string>, _password, "password",
+			std::string, mfa_code, "mfa_code",
 			std::optional<std::string>, token, "token") {
 		if(session->user) {
 			throw InvalidRequestDemand{"Already logged in"};
 		}
 		std::string username;
 		std::string password;
+		bool is_token_login=false;
 		if(!token->has_value()) {
 			if(!_username->has_value()||!_password->has_value()) {
 				throw InvalidRequestDemand{"Insufficient arguments"};
@@ -69,7 +71,7 @@ namespace FBUC {
 			username=**_username;
 			password=Utils::sha256(Secrets::addSalt(**_password));
 		}else{
-			return {false, "暂不支持 FBToken 登录"};
+			is_token_login=true;
 			if(_username->has_value()) {
 				throw InvalidRequestDemand{"Conflicted arguments"};
 			}
@@ -84,7 +86,29 @@ namespace FBUC {
 		std::shared_ptr<FBWhitelist::User> pUser=FBWhitelist::Whitelist::acquireUser(username);
 		if(!pUser||pUser->password!=password) {
 			SPDLOG_INFO("User Center login (rejected): Username: {}, IP: {}", username, session->ip_address);
-			return {false, "Invalid username or password"};
+			return {false, "Invalid username, password, or MFA code."};
+		}
+		if(!pUser->disable_all_security_measures) {
+			if(pUser->two_factor_authentication_secret.has_value()&&pUser->two_factor_authentication_secret->length()!=15) {
+				if(mfa_code->length()!=6) {
+					SPDLOG_INFO("User Center login (rejected): Username: {}, IP: {}", username, session->ip_address);
+					return {false, "Invalid username, password, or MFA code."};
+				}
+				char secret[17];
+				OTPData data;
+				totp_new(&data, pUser->two_factor_authentication_secret->c_str(), hmac_algo_sha1, get_current_time, 6, 30);
+				int val=totp_verify(&data, mfa_code->c_str(), time(nullptr), 2);
+				if(!val) {
+					return {false, "Invalid username, password, or MFA code."};
+				}
+			}else{
+				if(is_token_login||mfa_code->length()!=0) {
+					// 1. Token login but no MFA set
+					// 2. No MFA set but requester gives a MFA
+					SPDLOG_INFO("User Center login (rejected): Username: {}, IP: {}", username, session->ip_address);
+					return {false, "Invalid username, password, or MFA code."};
+				}
+			}
 		}
 		FBWhitelist::User *rawUser=pUser.get();
 		if(user_unique_map.contains(rawUser)) {
@@ -101,16 +125,7 @@ namespace FBUC {
 		std::string user_theme=pUser->preferredtheme.has_value()?(*pUser->preferredtheme):"bootstrap";
 		session->token_login=token->has_value();
 		session->phoenix_only=false;
-		if(session->login_2fa=pUser->two_factor_authentication_secret.has_value()) {
-			if(pUser->two_factor_authentication_secret->length()!=15) {
-				OTPDataPack *otpdata=new OTPDataPack;
-				strcpy(otpdata->secret, pUser->two_factor_authentication_secret->c_str());
-				session->tmp_otp=std::shared_ptr<OTPDataPack>(otpdata);
-				totp_new(&(otpdata->data), otpdata->secret, hmac_algo_sha1, get_current_time, 6, 30);
-			}else{
-				session->login_2fa=false;
-			}
-		}
+		session->login_2fa=false;
 		*pUser->keep_reference=true;
 		SPDLOG_INFO("User Center login (passed): Username: {}, IP: {}", username, session->ip_address);
 		return {true, "Welcome", "theme", user_theme, "isadmin", *pUser->isAdministrator};
@@ -139,7 +154,7 @@ namespace FBUC {
 	}
 	
 	LACTION0(FetchProfileAction, "fetch_profile") {
-		FBWhitelist::User user=*session->user;
+		FBWhitelist::User &user=*session->user;
 		std::string blc="机器人绑定码在 Token 登录状态下不能被显示。";
 		if(!session->token_login) {
 			blc=fmt::format("v|{}!{}", *(user.username), Utils::sha256(Secrets::add_external_bot_salt(user.username)));
@@ -156,7 +171,11 @@ namespace FBUC {
 			mp_duration=round(((session->user->expiration_date-time(nullptr))/86400.00)*100.0)/100.0;
 		}
 		int32_t user_points=session->user->points.has_value()?session->user->points:0;
-		return {true, "Well done", "blc", blc, "cn_username", cn_username, "slots", slots, "is_2fa", is_2fa, "monthly_plan_duration", mp_duration, "points", user_points, "nemcbind_status", session->user->nemc_binded_account.has_value()};
+		if(!user.phoenix_login_otp.has_value()) {
+			user.phoenix_login_otp=Utils::generateUUID();
+		}
+		std::string phoenix_otp=user.phoenix_login_otp;
+		return {true, "Well done", "blc", blc, "cn_username", cn_username, "slots", slots, "is_2fa", is_2fa, "monthly_plan_duration", mp_duration, "points", user_points, "nemcbind_status", session->user->nemc_binded_account.has_value(), "phoenix_otp", phoenix_otp, "no_security", (bool)user.disable_all_security_measures};
 	}
 	
 	LACTION1(SaveClientUsernameAction, "save_client_username",
@@ -216,7 +235,7 @@ namespace FBUC {
 	LACTION2(ChangePasswordAction, "change_password",
 			std::string, originalPassword, "originalPassword",
 			std::string, newPassword, "newPassword") {
-		if(session->token_login) {
+		if(session->token_login&&!session->user->disable_all_security_measures) {
 			throw InvalidRequestDemand{"Changing password is forbidden for token-login users."};
 		}
 		if(originalPassword->length()!=64||newPassword->length()!=64||newPassword=="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") {
@@ -276,6 +295,8 @@ namespace FBUC {
 	}
 	
 	LACTION0(Kickstart2FAAction, "kickstart_2fa") {
+		if(session->user->disable_all_security_measures)
+			throw InvalidRequestDemand{"User is forbidden from enabling 2FA"};
 		if(session->user->two_factor_authentication_secret.has_value()) {
 			throw InvalidRequestDemand{"User already under 2FA"};
 		}
@@ -348,46 +369,12 @@ namespace FBUC {
 		return {true};
 	}
 	
-	LACTION1(ListUserRentalServersAction, "list_user_rental_servers",
-			FBWhitelist::User, user, "user") {
-		return {true, "", "rentalservers", user->rentalservers.toAdministrativeJSON()};
+	LACTION0(DisableAllSecurityMeasuresAction, "disable_all_security_measures") {
+		session->user->disable_all_security_measures=true;
+		return {true};
 	}
 	
-	LACTION3(RentalServerOperationAction, "rental_server_operation",
-			FBWhitelist::User, user, "username",
-			std::optional<std::string>, slotid, "slotid",
-			std::string, operation, "operation") {
-		if(operation=="unlock") {
-			if(!slotid->has_value()) {
-				throw InvalidRequestDemand{"Missing required argument `slotid'."};
-			}
-			auto slot=user->rentalservers[**slotid];
-			if(slot) {
-				slot.locked.unset();
-				slot.lastdate.unset();
-			}
-		}else if(operation=="remove") {
-			if(!slotid->has_value()) {
-				throw InvalidRequestDemand{"Missing required argument `slotid'."};
-			}
-			user->rentalservers.erase_slot(**slotid);
-		}else if(operation=="add") {
-			user->rentalservers.append_slot();
-		}else if(operation=="lock") {
-			if(!slotid->has_value()) {
-				throw InvalidRequestDemand{"Missing required argument `slotid'."};
-			}
-			auto slot=user->rentalservers[**slotid];
-			if(slot) {
-				slot.locked=true;
-			}
-		}else{
-			throw InvalidRequestDemand{"Invalid operation"};
-		}
-		return {true, "ok"};
-	}
-	
-	static FBUCActionCluster basicGeneralActions(0, {
+	static FBUCActionCluster accountGeneralActions(0, {
 		Action::enmap(new APIListAction),
 		Action::enmap(new LoginAction),
 		Action::enmap(new CaptchaAction),
@@ -403,7 +390,6 @@ namespace FBUC {
 		Action::enmap(new FinishRegistering2FAAction),
 		Action::enmap(new FinishLogin2FAAction),
 		Action::enmap(new Retract2FAAction),
-		Action::enmap(new ListUserRentalServersAction),
-		Action::enmap(new RentalServerOperationAction)
+		Action::enmap(new DisableAllSecurityMeasuresAction)
 	});
 };
