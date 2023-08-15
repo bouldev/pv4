@@ -39,6 +39,9 @@ namespace FBUC {
 			password=token_content["password"].asString();
 		}
 		std::shared_ptr<FBWhitelist::User> pUser=FBWhitelist::Whitelist::acquireUser(username);
+		if(!pUser) {
+			return {false, "无效用户名或一次性密码，注意: 为防止账号盗用，您不再能够使用用户中心的密码登录 PhoenixBuilder ，请使用 FBToken 或用户中心一次性密码登录。"};
+		}
 		if(!pUser->disable_all_security_measures) {
 			if(login_token->has_value()) {
 				if(!pUser||pUser->password!=password) {
