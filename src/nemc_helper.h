@@ -25,9 +25,9 @@ public:
 	operator bsoncxx::array::view();
 	
 	bool isLoggedIn() const;
-	std::variant<std::string, NEMCError> getUsername() const;
-	std::optional<NEMCError> setUsername(std::string const& username) const;
-	std::variant<std::pair<std::string, std::string>, NEMCError> doImpact(std::string const& serverCode, std::string const& serverPasscode, std::string const& clientKey, std::string const& username) const;
+	std::string getUsername() const;
+	void setUsername(std::string const& username) const;
+	std::pair<std::string, std::string> doImpact(std::string const& serverCode, std::string const& serverPasscode, std::string const& clientKey, std::string const& username) const;
 	inline std::string getUID() const { return "0"; };
 	
 	bool operator==(NEMCUser const& value) const;
@@ -40,21 +40,24 @@ private:
 	std::string some_sercret;
 public:
 	std::string verify_url="https://google.com";
+	std::string randid_used;
 private:
 	bsoncxx::array::value stored_arr_value = bsoncxx::builder::stream::array{}<<bsoncxx::builder::stream::finalize;
 public:
 	NEMCUserAuthInfo() { };
 	NEMCUserAuthInfo(bsoncxx::document::element const& authInfo);
 	operator bsoncxx::array::view();
-	std::variant<std::string, NEMCError> getJitsuMeiAddress() const;
-	std::variant<NEMCUser, NEMCError> auth() const;
+	std::string getJitsuMeiAddress() const;
+	NEMCUser auth() const;
 	
 	bool operator==(NEMCUserAuthInfo const& value) const;
 	inline bool has_user() const { return false; }
+	inline bool has_device() const { return false; }
 	
 	
-	static std::variant<NEMCUserAuthInfo, NEMCError> createGuest();
-	static std::variant<NEMCUserAuthInfo, NEMCError> createGuest(NEMCUserAuthInfo const& device);
+	static NEMCUserAuthInfo loginWithEmail(std::string const& email, std::string const& password, std::string const& randId);
+	static NEMCUserAuthInfo createGuest(std::string const& randId);
+	static NEMCUserAuthInfo createGuest(NEMCUserAuthInfo const& device);
 };
 
 std::string NEMCCalculateStartType(std::string const& content, std::string const& uid);

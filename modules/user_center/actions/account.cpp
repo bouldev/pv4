@@ -125,7 +125,6 @@ namespace FBUC {
 		std::string user_theme=pUser->preferredtheme.has_value()?(*pUser->preferredtheme):"bootstrap";
 		session->token_login=token->has_value();
 		session->phoenix_only=false;
-		session->login_2fa=false;
 		*pUser->keep_reference=true;
 		SPDLOG_INFO("User Center login (passed): Username: {}, IP: {}", username, session->ip_address);
 		return {true, "Welcome", "theme", user_theme, "isadmin", *pUser->isAdministrator};
@@ -287,7 +286,6 @@ namespace FBUC {
 		}
 		*user->keep_reference=true;
 		session->user=std::make_shared<FBWhitelist::User>(*user);
-		session->login_2fa=false;
 		session->token_login=false;
 		session->phoenix_only=false;
 		SPDLOG_INFO("User Center register: Username: {}, IP: {}", *username, session->ip_address);
@@ -347,20 +345,6 @@ namespace FBUC {
 		return {true, "ok"};
 	}
 	
-	LACTION1(FinishLogin2FAAction, "finish_login_2fa",
-			std::string, code, "code") {
-		if(!session->login_2fa) {
-			throw InvalidRequestDemand{"Invalid request"};
-		}
-		int val=totp_verify(&session->tmp_otp->data, code->c_str(), time(nullptr), 2);
-		if(!val) {
-			return {false, "验证码不正确"};
-		}
-		session->login_2fa=false;
-		session->tmp_otp=nullptr;
-		return {true};
-	}
-	
 	LACTION0(Retract2FAAction, "retract_2fa") {
 		if(!session->user->two_factor_authentication_secret.has_value()) {
 			throw InvalidRequestDemand{"Invalid request"};
@@ -388,7 +372,6 @@ namespace FBUC {
 		Action::enmap(new RegisterAction),
 		Action::enmap(new Kickstart2FAAction),
 		Action::enmap(new FinishRegistering2FAAction),
-		Action::enmap(new FinishLogin2FAAction),
 		Action::enmap(new Retract2FAAction),
 		Action::enmap(new DisableAllSecurityMeasuresAction)
 	});

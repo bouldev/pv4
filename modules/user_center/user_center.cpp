@@ -92,14 +92,6 @@ static void FBUC::enter_action_clust(FBUC::Action *action, Json::Value& parsed_a
 		if(!currentSession->user&&(administrative||action->mandatory_login())) {
 			throw FBUC::InvalidRequestDemand{"Login Required"};
 		}
-		if(currentSession->user&&currentSession->login_2fa) {
-			if(action->action_name!="api"&&
-				action->action_name!="fetch_announcements"&&
-				action->action_name!="finish_login_2fa"&&
-				action->action_name!="logout") {
-				throw FBUC::AccessDeniedDemand{"Please complete 2FA"};
-			}
-		}
 		if(currentSession->user&&currentSession->phoenix_only) {
 			std::regex phoenix_only_match("^phoenix\\/(.*?)$", std::regex_constants::ECMAScript);
 			std::smatch sm;
@@ -401,7 +393,7 @@ extern "C" void init_user_center() {
 				res.set_content(fmt::format("400 Invalid Request\n\nExpected JSON data, where JSON parsing failed.\n\nError: {}", error_message), "text/plain");
 				return;
 			}
-			enter_action_clust(action, parsed_args, req, res);
+			enter_action_clust(action, parsed_args, req, res, isAdministrative);
 		});
 		server.set_post_routing_handler([](const auto& req, auto& res) {
 			res.set_header("access-control-allow-credentials", "true");

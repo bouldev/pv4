@@ -35,7 +35,6 @@ namespace FBUC {
 		std::vector<Product *> cart;
 		std::shared_ptr<PaymentIntent> payment_intent;
 		//PaymentIntent *payment_intent=nullptr;
-		bool login_2fa;
 		std::shared_ptr<OTPDataPack> tmp_otp;
 		time_t last_alive;
 		bool phoenix_only=false;

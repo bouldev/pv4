@@ -38,7 +38,7 @@ private:
 	std::string some_secret;
 public:
 	std::string verify_url="https://google.com";
-	std::string randId;
+	std::string randid_used;
 private:
 	bsoncxx::array::value stored_arr_value = bsoncxx::builder::stream::array{}<<bsoncxx::builder::stream::finalize;
 public:
@@ -50,7 +50,7 @@ public:
 	
 	bool operator==(NEMCUserAuthInfo const& value) const;
 	
-	static NEMCUserAuthInfo loginWithEmail(std::string const& email, std::string const& password);
+	static NEMCUserAuthInfo loginWithEmail(std::string const& email, std::string const& password, std::string const& randId);
 	static NEMCUserAuthInfo createGuest(std::string const& randId);
 	static NEMCUserAuthInfo createGuest(NEMCUserAuthInfo const& device);
 };

@@ -82,9 +82,6 @@ namespace FBUC {
 	
 	
 	LACTION0(FetchAnnouncementsAction, "fetch_announcements") {
-		if(session->login_2fa) {
-			return {false, "2FA is required", "is_2fa", true};
-		}
 		Json::Value outvalues(Json::arrayValue);
 		auto client=mongodb_pool.acquire();
 		auto fbdb=(*client)["fastbuilder"];

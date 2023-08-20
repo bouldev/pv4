@@ -23,7 +23,7 @@ std::string NEMCUserAuthInfo::getJitsuMeiAddress() const {
 	throw NEMCError{"Failed to get realname address as this function is stubbed.", -1};
 }
 
-NEMCUserAuthInfo NEMCUserAuthInfo::loginWithEmail(std::string const& e,std::string const& p) {
+NEMCUserAuthInfo NEMCUserAuthInfo::loginWithEmail(std::string const& e,std::string const& p,std::string const& r) {
 	throw NEMCError{"Stubbed", -1};
 }
 

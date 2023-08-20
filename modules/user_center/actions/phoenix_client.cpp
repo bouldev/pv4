@@ -65,6 +65,37 @@ namespace FBUC {
 			SPDLOG_INFO("Phoenix login (rejected): {} -> {} [no payment] IP: {}", *user->username, *server_code, session->ip_address);
 			return {false, "月额 Plan 失效已过或从未激活，请前往用户中心购买。"};
 		}
+		if(server_code=="::DRY::"&&server_passcode=="::DRY::") {
+			SPDLOG_INFO("Phoenix login (passed - dry): {}, IP: {}", *user->username, session->ip_address);
+			std::string pubKey;
+			if(!user->signing_key.has_value()) {
+				auto keyPair=Utils::generateRSAKeyPair();
+				FBWhitelist::SigningKeyPair skp;
+				skp.private_key=keyPair.first;
+				skp.public_key=keyPair.second;
+				pubKey=keyPair.second;
+				user->signing_key=skp;
+			}else{
+				pubKey=(std::string)user->signing_key->public_key;
+			}
+			std::string privateSigningKeyProve=fmt::format("{}|{}", pubKey, *user->username);
+			privateSigningKeyProve.append(fmt::format("::{}", Utils::cv4Sign(privateSigningKeyProve)));
+			session->user=pUser;
+			session->phoenix_only=true;
+			std::string rettoken="";
+			if(!login_token->has_value()) {
+				Json::Value token;
+				token["username"]=username;
+				token["password"]=pUser->password;
+				token["newToken"]=true;
+				rettoken=FBToken::encrypt(token);
+			}
+			std::string respond_to;
+			if(user->cn_username.has_value()) {
+				respond_to=user->cn_username;
+			}
+			return {true, "well done", "dry", true, "privateSigningKey", user->signing_key->private_key, "prove", privateSigningKeyProve, "token", rettoken, "respond_to", respond_to};
+		}
 		if(!user->nemc_access_info.has_value()) {
 			SPDLOG_INFO("Phoenix login (rejected): {} -> {} [no helper] IP: {}", *user->username, *server_code, session->ip_address);
 			return {false, "未创建辅助用户，请前往用户中心创建。", "translation", 7};
@@ -116,7 +147,6 @@ namespace FBUC {
 			return {false, err.description, "translation", err.translation>0?err.translation:-1};
 		}
 		SPDLOG_INFO("Phoenix login (passed): {} -> {}, Helper: {}, IP: {}", *user->username, *server_code, helperun, session->ip_address);
-		std::string usernameForJS=fmt::format("{}|{}", *user->username, Utils::cv4Sign(user->username));
 		std::string pubKey;
 		if(!user->signing_key.has_value()) {
 			auto keyPair=Utils::generateRSAKeyPair();
@@ -131,7 +161,6 @@ namespace FBUC {
 		std::string privateSigningKeyProve=fmt::format("{}|{}", pubKey, *user->username);
 		privateSigningKeyProve.append(fmt::format("::{}", Utils::cv4Sign(privateSigningKeyProve)));
 		session->user=pUser;
-		session->login_2fa=false;
 		session->phoenix_only=true;
 		std::string rettoken="";
 		if(!login_token->has_value()) {
