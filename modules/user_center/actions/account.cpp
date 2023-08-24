@@ -267,7 +267,7 @@ namespace FBUC {
 			std::string, captcha, "captcha") {
 		if(password->length()!=64)
 			throw InvalidRequestDemand{"Invalid request"};
-		if(captcha->length()!=12||!session->verifyCaptcha(captcha)) {
+		if(!session->verifyCaptcha(captcha)) {
 			return {false, "验证码不正确"};
 		}
 		std::regex username_req("^[A-Za-z0-9]+$", std::regex_constants::ECMAScript);

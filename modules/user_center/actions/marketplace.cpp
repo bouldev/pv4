@@ -368,6 +368,8 @@ namespace FBUC {
 			uint32_t, value, "value") {
 		if(*value>=800||*value<6)
 			throw InvalidRequestDemand{"Invalid amount given"};
+		if(*session->user->promocode_count==0)
+			throw InvalidRequestDemand{"User not permitted to charge"};
 		std::string return_url=fmt::format("https://api.fastbuilder.pro/api/stripe_recover?is_checkout=1&ssid={}", session->session_id);
 		if(getenv("DEBUG")) {
 			return_url=fmt::format("http://127.0.0.1:8687/api/stripe_recover?is_checkout=1&ssid={}", session->session_id);

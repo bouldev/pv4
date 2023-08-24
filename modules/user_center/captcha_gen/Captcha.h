@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#define IMAGE_H 100
+#define IMAGE_H 600
 #define IMAGE_W 600
 #define CAPTCHA_LEN 12
 
