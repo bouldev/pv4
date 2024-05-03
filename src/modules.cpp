@@ -124,7 +124,7 @@ Json::Value Modules::loadModulesDefinition() {
 	free(modules_def);
 	Json::Value mdl_def;
 	std::string mdl_def_parse_error;
-	if(!Utils::parseJSON(modules_def_str, &mdl_def, &mdl_def_parse_error)) {
+	if(!Utils::parseJSON(modules_def_str, &mdl_def, &mdl_def_parse_error, true)) {
 		throw std::runtime_error(fmt::format("Failed to parse modules definition file modules.json: {}", mdl_def_parse_error));
 	}
 	if(!mdl_def.isArray()) {

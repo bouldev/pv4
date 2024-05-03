@@ -104,7 +104,7 @@ namespace FBUC {
 			}else{
 				if(is_token_login||mfa_code->length()!=0) {
 					// 1. Token login but no MFA set
-					// 2. No MFA set but requester gives a MFA
+					// 2. No MFA set but a MFA is given in request
 					SPDLOG_INFO("User Center login (rejected): Username: {}, IP: {}", username, session->ip_address);
 					return {false, "Invalid username, password, or MFA code."};
 				}
@@ -178,7 +178,7 @@ namespace FBUC {
 	}
 	
 	LACTION1(SaveClientUsernameAction, "save_client_username",
-			std::string, username, "cnun") {
+			std::string, username, "client_username") {
 		if(username->length()>32) {
 			return {false, "用户名太长"};
 		}
@@ -196,7 +196,7 @@ namespace FBUC {
 		}
 		auto &slot=user->rentalservers[slotid];
 		if(!slot) {
-			return {false, "内部错误: slotid 无效"};
+			return {false, "Internal error: Invalid slotid"};
 		}
 		if(!content->has_value()&&**operation!="remove") {
 			throw InvalidRequestDemand{"Invalid request"};

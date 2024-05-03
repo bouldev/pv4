@@ -173,9 +173,9 @@ std::string Utils::writeJSON(Json::Value const& value) {
 	return Json::writeString(jwb, value);
 }
 
-bool Utils::parseJSON(std::string const& jsonContent, Json::Value *value, std::string *parsingError) {
+bool Utils::parseJSON(std::string const& jsonContent, Json::Value *value, std::string *parsingError, bool allowComments) {
 	Json::CharReaderBuilder builder;
-	builder["allowComments"]=false;
+	builder["allowComments"]=allowComments;
 	builder["stackLimit"]=16;
 	Json::CharReader *reader=builder.newCharReader();
 	bool ret=reader->parse(jsonContent.c_str(), jsonContent.c_str()+jsonContent.size(), value, parsingError);

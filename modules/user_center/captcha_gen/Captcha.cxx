@@ -9,6 +9,9 @@
 #include <string>
 #include <vector>
 #include "utils.h"
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#include "cpp-httplib/httplib.h"
+
 
 #define NUMBER 10
 
@@ -68,8 +71,28 @@ int generateCaptcha(std::vector<unsigned char> &buffer, string &captcha_text) {
   buffer = {};
   captcha_text = "";
   try {
+	  Mat image;
+	  httplib::Client rdClient("https://random.dog");
+	  while(true) {
+		  auto woof=rdClient.Get("/woof.json");
+		  Json::Value woofJson;
+		  if(!Utils::parseJSON(woof->body, &woofJson)) {
+			image=Mat::zeros(600, 600, CV_8UC3);
+			break;
+		  }
+		  const std::regex wurl_regex("https:\\/\\/random\\.dog(\\/.+\\.jpg)$");
+		  std::smatch wmatch;
+		  std::string image_url=woofJson["url"].asString();
+		  if(!std::regex_match(image_url, wmatch, wurl_regex))
+			  continue;
+		  auto dogImage=rdClient.Get(wmatch[1].str());
+		  std::vector<unsigned char> body_vec(dogImage->body.begin(), dogImage->body.end());
+		  Mat fullImage=cv::imdecode(body_vec, -1);
+		  cv::resize(fullImage, image, cv::Size(600, 600), 0, 0, cv::INTER_AREA);
+		  break;
+	  }
     //Mat image = Mat::zeros(IMAGE_H, IMAGE_W, CV_8UC3);
-    Mat image=Mat::zeros(600, 600, CV_8UC3);
+    //Mat image=Mat::zeros(600, 600, CV_8UC3);
     //drawingRandomLines(image);
     //drawingRandomText(image);
     std::string text;

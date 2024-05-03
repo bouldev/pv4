@@ -6,6 +6,7 @@
 #include <fmt/format.h>
 
 extern httplib::Client stripeClient;
+extern httplib::Client coinbaseClient;
 
 namespace FBUC {
 	LACTION0(GetProductListAction, "get_product_list") {
@@ -324,6 +325,49 @@ namespace FBUC {
 		return {true, "", "url", stripe_parsed["url"]};
 	}
 	
+	LACTION0(CoinbaseCreateSessionAction, "coinbase_create_session") {
+		std::shared_ptr<FBUC::PaymentIntent> intent=session->payment_intent;
+		if(!intent||intent->approved) {
+			return {false, "没有有效的支付请求"};
+		}
+		if(!intent->content.size()) {
+			throw InvalidRequestDemand{"Invalid request"};
+		}
+		if(intent->banned_from_payment) {
+			throw InvalidRequestDemand{"Payment request while being banned from payment"};
+		}
+		std::string return_url="https://api.fastbuilder.pro/api/stripe_recover?ssid=";
+		if(getenv("DEBUG")) {
+			return_url="http://127.0.0.1:8687/api/stripe_recover?ssid=";
+		}
+		return_url+=session->session_id;
+		Json::Value charge_info;
+		charge_info["name"]="User Center Payment";
+		charge_info["description"]="User Center Payment";
+		Json::Value local_price;
+		local_price["amount"]=std::to_string(intent->stripe_price)+".00";
+		local_price["currency"]="CNY";
+		charge_info["local_price"]=local_price;
+		charge_info["pricing_type"]="fixed_price";
+		charge_info["redirect_url"]=return_url;
+		charge_info["cancel_url"]=return_url;
+		coinbase_retry_01: {}
+		auto coinbase_res=coinbaseClient.Post("/charges", Utils::writeJSON(charge_info), "application/json");
+		if(!coinbase_res) {
+			goto coinbase_retry_01;
+		}
+		Json::Value cbr_parsed;
+		if(!Utils::parseJSON(coinbase_res->body, &cbr_parsed, nullptr)) {
+			throw ServerErrorDemand{"Failed to parse coinbase response"};
+		}
+		std::string const& payment_code=cbr_parsed["data"]["code"].asString();
+		payments_mutex.lock();
+		payment_intents[fmt::format("c#{}",payment_code)]=payment_intents[session->user->username];
+		payments_mutex.unlock();
+		intent->stripe_pid=payment_code;
+		return {true, "", "url", cbr_parsed["data"]["hosted_url"]};
+	}
+	
 	/*LACTION0(GetPaymentLogAction, "get_payment_log") {
 		std::shared_ptr<FBWhitelist::User> user=session->user;
 		auto client=mongodb_pool.acquire();
@@ -464,7 +508,8 @@ namespace FBUC {
 		Action::enmap(new HelperChargeAction),
 		Action::enmap(new CheckoutUsePointsAction),
 		Action::enmap(new RedeemForFreeAction),
-		Action::enmap(new StripeCreateSessionAction)
+		Action::enmap(new StripeCreateSessionAction),
+		Action::enmap(new CoinbaseCreateSessionAction)
 		//Action::enmap(new GetPaymentLogAction) -> db_related.cpp
 	});
 };

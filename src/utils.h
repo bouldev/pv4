@@ -20,7 +20,7 @@ namespace Utils {
 	uint32_t safeRandomNumber();
 	std::string sha256(std::string const& value);
 	std::string writeJSON(Json::Value const& value);
-	bool parseJSON(std::string const& jsonContent, Json::Value *value, std::string *parsingError=nullptr);
+	bool parseJSON(std::string const& jsonContent, Json::Value *value, std::string *parsingError=nullptr, bool allowComments=false);
 	std::string str2hexUpper(std::string const& input);
 	std::string str2hex(std::string const& input);
 	std::string hex2str(std::string const& input);

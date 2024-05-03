@@ -31,6 +31,7 @@ using bsoncxx::builder::stream::open_document;
 extern mongocxx::pool mongodb_pool;
 
 httplib::Client stripeClient("https://api.stripe.com");
+httplib::Client coinbaseClient("https://api.commerce.coinbase.com");
 
 void FBUC::finalizePaymentIntent(std::shared_ptr<FBUC::PaymentIntent> intent, FBWhitelist::User *user, std::string const& helper_name) {
 	auto pSession=intent->session.lock();
@@ -126,6 +127,12 @@ static void FBUC::enter_action_clust(FBUC::Action *action, Json::Value& parsed_a
 
 
 extern "C" void init_user_center() {
+	coinbaseClient.set_keep_alive(true);
+	httplib::Headers headers{
+		{"X-CC-Version", "2018-03-22"},
+		{"X-CC-Api-Key", Secrets::get_coinbase_api_key()}
+	};
+	coinbaseClient.set_default_headers(headers);
 	stripeClient.set_keep_alive(true);
 	stripeClient.set_bearer_token_auth(Secrets::get_stripe_key());
 	std::thread([](){
@@ -347,6 +354,42 @@ extern "C" void init_user_center() {
 				return;
 			}
 			FBUC::finalizePaymentIntent(intent, user->user.get(), fmt::format("@Stripe+{}", session["id"].asString()));
+		});
+		server.Post("/api/coinbase/webhook", [](const httplib::Request& req, httplib::Response& res) {
+			std::string signature_content=req.get_header_value("X-CC-Webhook-Signature");
+			std::string coinbase_key=Secrets::get_coinbase_webhook_secret();
+			std::string out_md;
+			out_md.resize(32);
+			unsigned int oml=32;
+			HMAC(EVP_sha256(), coinbase_key.c_str(), coinbase_key.length(), (const unsigned char *)req.body.c_str(), req.body.size(), (unsigned char *)&out_md.front(), &oml);
+			if(Utils::hex2str(signature_content)!=out_md) {
+				res.status=400;
+				res.set_content("Illegal request", "text/plain");
+				return;
+			}
+			Json::Value content;
+			if(!Utils::parseJSON(req.body, &content)) {
+				res.status=400;
+				res.set_content("Illegal request", "text/plain");
+				return;
+			}
+			if(content["event"]["type"].asString()!="charge:confirmed") {
+				return;
+			}
+			payments_mutex.lock_shared();
+			std::string c_code=fmt::format("c#{}", content["event"]["data"]["code"].asString());
+			if(!payment_intents.contains(c_code)) {
+				payments_mutex.unlock_shared();
+				return;
+			}
+			auto intent=payment_intents[c_code];
+			payments_mutex.unlock_shared();
+			std::shared_ptr<FBUC::UserSession> user=intent->session.lock();
+			if(!user) {
+				res.status=500;
+				return;
+			}
+			FBUC::finalizePaymentIntent(intent, user->user.get(), fmt::format("@Coinbase+{}", c_code));
 		});
 		server.Options(R"(/api/(administrative/)?((phoenix/)?[0-9a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
 			res.status=204;

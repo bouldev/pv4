@@ -83,6 +83,9 @@ void FBWhitelist::DBValue<T, DT>::_set(T const& target) {
 
 template <typename T, typename DT>
 void FBWhitelist::DBValue<T, DT>::set(T const& target) {
+#ifdef FBDB_READONLY
+	return;
+#endif
 	w_lock->lock();
 	*object=std::make_shared<T>(target);
 	auto client=mongodb_pool.acquire();
@@ -93,6 +96,9 @@ void FBWhitelist::DBValue<T, DT>::set(T const& target) {
 
 template <typename T, typename DT>
 void FBWhitelist::DBValue<T, DT>::unset() {
+#ifdef FBDB_READONLY
+	return;
+#endif
 	w_lock->lock();
 	*object=nullptr;
 	auto client=mongodb_pool.acquire();
@@ -222,6 +228,9 @@ void FBWhitelist::DBValue<T, DT>::fromJSON(Json::Value const& value) {
 
 template <typename T, typename DT>
 void FBWhitelist::RentalServerDBValue<T, DT>::set(T const& target) {
+#ifdef FBDB_READONLY
+	return;
+#endif
 	this->w_lock->lock();
 	*(this->object)=std::make_shared<T>(target);
 	auto client=mongodb_pool.acquire();
@@ -233,6 +242,9 @@ void FBWhitelist::RentalServerDBValue<T, DT>::set(T const& target) {
 
 template <typename T, typename DT>
 void FBWhitelist::RentalServerDBValue<T, DT>::unset() {
+#ifdef FBDB_READONLY
+	return;
+#endif
 	this->w_lock->lock();
 	*(this->object)=nullptr;
 	auto client=mongodb_pool.acquire();
@@ -260,6 +272,9 @@ void FBWhitelist::RentalServerStore::erase_slot(std::unordered_map<std::string, 
 }
 
 void FBWhitelist::RentalServerStore::erase_slot(std::string const& key) {
+#ifdef FBDB_READONLY
+	return;
+#endif
 	if(!rentalServerMap->contains(key)) {
 		return;
 	}
@@ -313,6 +328,9 @@ Json::Value FBWhitelist::RentalServerStore::toAdministrativeJSON() const {
 }
 
 FBWhitelist::RentalServerItem& FBWhitelist::RentalServerStore::append_slot() {
+#ifdef FBDB_READONLY
+	throw std::runtime_error("NOT SUPPOSED TO BE CALLED");
+#endif
 	write_mutex->lock();
 	std::string slotid;
 	do {

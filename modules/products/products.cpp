@@ -14,7 +14,7 @@ struct FixedSlotProduct:Product {
 	}
 	
 	virtual unsigned int price() {
-		return 32;
+		return 25;
 	}
 	
 	virtual std::string product_detail() {
@@ -50,7 +50,7 @@ struct SlotProduct : Product {
 	}
 	
 	virtual unsigned int price() {
-		return 80;
+		return 55;
 	}
 	
 	virtual std::string product_detail() {
@@ -127,7 +127,7 @@ struct MonthlyPlan1MonthProduct : Product {
 	}
 	
 	virtual unsigned int price() {
-		return 32;
+		return 35;
 	}
 	
 	virtual std::string product_detail() {
@@ -165,7 +165,7 @@ struct MonthlyPlan3MonthsProduct : Product {
 	}
 	
 	virtual unsigned int price() {
-		return 92;
+		return 100;
 	}
 	
 	virtual std::string product_detail() {
@@ -203,7 +203,7 @@ struct MonthlyPlan2YearsProduct : Product {
 	}
 	
 	virtual unsigned int price() {
-		return 750;
+		return 700;
 	}
 	
 	virtual std::string product_detail() {
