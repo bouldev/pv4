@@ -5,6 +5,8 @@
 #include <string>
 #include <fmt/format.h>
 
+#warning Using skel Secrets! please modify ./modules/secrets/secrets.h to use your own!
+
 class Secrets {
 public:
 	static std::string addSalt(std::string const& original) {
@@ -52,6 +54,7 @@ static const unsigned char *_fbtoken_key=(unsigned char*)"0123456789abcdefghijkl
 
 #else
 
+/* This shall define PV4_PRIVATE_SOURCE */
 #include "../private/secrets/secrets.h"
 
 #endif

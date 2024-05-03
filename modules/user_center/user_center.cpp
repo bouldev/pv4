@@ -31,7 +31,9 @@ using bsoncxx::builder::stream::open_document;
 extern mongocxx::pool mongodb_pool;
 
 httplib::Client stripeClient("https://api.stripe.com");
+#ifdef PV4_PRIVATE_SOURCE
 httplib::Client coinbaseClient("https://api.commerce.coinbase.com");
+#endif
 
 void FBUC::finalizePaymentIntent(std::shared_ptr<FBUC::PaymentIntent> intent, FBWhitelist::User *user, std::string const& helper_name) {
 	auto pSession=intent->session.lock();
@@ -127,12 +129,14 @@ static void FBUC::enter_action_clust(FBUC::Action *action, Json::Value& parsed_a
 
 
 extern "C" void init_user_center() {
+#ifdef PV4_PRIVATE_SOURCE
 	coinbaseClient.set_keep_alive(true);
 	httplib::Headers headers{
 		{"X-CC-Version", "2018-03-22"},
 		{"X-CC-Api-Key", Secrets::get_coinbase_api_key()}
 	};
 	coinbaseClient.set_default_headers(headers);
+#endif
 	stripeClient.set_keep_alive(true);
 	stripeClient.set_bearer_token_auth(Secrets::get_stripe_key());
 	std::thread([](){
@@ -355,6 +359,7 @@ extern "C" void init_user_center() {
 			}
 			FBUC::finalizePaymentIntent(intent, user->user.get(), fmt::format("@Stripe+{}", session["id"].asString()));
 		});
+#ifdef PV4_PRIVATE_SOURCE
 		server.Post("/api/coinbase/webhook", [](const httplib::Request& req, httplib::Response& res) {
 			std::string signature_content=req.get_header_value("X-CC-Webhook-Signature");
 			std::string coinbase_key=Secrets::get_coinbase_webhook_secret();
@@ -391,6 +396,7 @@ extern "C" void init_user_center() {
 			}
 			FBUC::finalizePaymentIntent(intent, user->user.get(), fmt::format("@Coinbase+{}", c_code));
 		});
+#endif
 		server.Options(R"(/api/(administrative/)?((phoenix/)?[0-9a-zA-Z_]+)$)", [](const httplib::Request& req, httplib::Response& res) {
 			res.status=204;
 		});
